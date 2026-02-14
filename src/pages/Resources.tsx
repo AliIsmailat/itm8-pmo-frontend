@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import PageHeader from "../components/PageHeader";
-import ResourceCard from "../components/ResourceCard";
-import ResourceActions from "../components/ResourceActions.tsx";
-import Pagination from "../components/Pagination";
+import PageHeader from "../components/ui/PageHeader.tsx";
+import ResourceCard from "../components/resources/ResourceCard.tsx";
+import ResourceActions from "../components/resources/ResourceActions.tsx";
+import Pagination from "../components/projects/Pagination.tsx";
 
 const resources = [
   {

@@ -6,7 +6,8 @@ export type Phase = {
   duration: number;
   usedWeeks?: number;
   color?: string;
-  owner: string;
+  owner?: string;
+  resources?: string[];
   status?: "onTime" | "risk" | "delayed";
 };
 
@@ -25,6 +26,7 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
   top = 0,
   weekWidth = 24,
   owner,
+  resources = [],
   status = "onTime",
   onEdit,
 }) => {
@@ -38,7 +40,16 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
 
   const handleClick = () => {
     if (onEdit) {
-      onEdit({ name, startWeek, duration, usedWeeks, owner, status, color });
+      onEdit({
+        name,
+        startWeek,
+        duration,
+        usedWeeks,
+        owner,
+        status,
+        color,
+        resources,
+      });
     }
   };
 
@@ -56,7 +67,7 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
     >
       <div className="relative h-full w-full">
         <div
-          className="absolute h-full rounded-l left-0 top-0"
+          className="absolute h-full rounded left-0 top-0"
           style={{
             width: `${duration * weekWidth}px`,
             backgroundColor: color,
@@ -76,17 +87,18 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
           />
         )}
 
-        <div className="absolute w-full text-center text-white text-xs top-0 h-full flex items-center justify-center pointer-events-none">
-          {name}
-        </div>
+        <div className="absolute w-full text-center text-white text-xs top-0 h-full flex items-center justify-center pointer-events-none" />
 
         {hover && (
-          <div className="absolute -top-16 -left-5 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
+          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-2 rounded shadow-lg whitespace-nowrap z-10">
             <div className="font-semibold">{name}</div>
             <div>
               Vecka {startWeek} - {startWeek + duration - 1}
             </div>
             {owner && <div>Ansvarig: {owner}</div>}
+            {resources.length > 0 && (
+              <div>Resurser: {resources.join(", ")}</div>
+            )}
             {usedWeeks !== undefined && (
               <div>
                 Förbrukade veckor: {usedWeeks} / Planerat: {duration}

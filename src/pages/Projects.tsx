@@ -1,8 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import PageHeader from "../components/PageHeader";
-import ProjectTable from "../components/ProjectTable";
-import { projects } from "../dummyprojects";
+import PageHeader from "../components/ui/PageHeader";
+import ProjectTable from "../components/projects/ProjectTable";
+import { projects } from "../dummyProjects";
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();

@@ -1,5 +1,5 @@
 import React from "react";
-import type { Project } from "../components/ProjectTable";
+import type { Project } from "./ProjectTable";
 interface ProjectInfoProps {
   project: Project;
 }

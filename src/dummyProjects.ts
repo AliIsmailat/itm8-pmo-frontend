@@ -1,4 +1,4 @@
-import type { Project } from "./components/ProjectTable"
+import type { Project } from "./components/projects/ProjectTable";
 
 export const projects: Project[] = [
   {
@@ -10,6 +10,7 @@ export const projects: Project[] = [
     budgetHours: 120,
     resources: ["Alice", "Bob"],
     usedHours: 48,
+    phase: "Planering",
   },
   {
     id: 2,
@@ -18,8 +19,9 @@ export const projects: Project[] = [
     startDate: "2026-02-01",
     endDate: "2026-04-15",
     budgetHours: 200,
-    resources: ["Charlie", "Diana", "Eve"],
+    resources: ["Charlie", "Diana", "Eve", "Ali", "Gustav"],
     usedHours: 95,
+    phase: "Pågående",
   },
   {
     id: 3,
@@ -30,5 +32,28 @@ export const projects: Project[] = [
     budgetHours: 300,
     resources: ["Alice", "Bob", "Eve"],
     usedHours: 140,
+    phase: "Pågående",
+  },
+  {
+    id: 4,
+    name: "Intranät",
+    customer: "Beta AB",
+    startDate: "2026-03-01",
+    endDate: "2026-06-01",
+    budgetHours: 150,
+    resources: ["Diana", "Gustav"],
+    usedHours: 50,
+    phase: "Planering",
+  },
+  {
+    id: 5,
+    name: "Analytics Dashboard",
+    customer: "Gamma Solutions",
+    startDate: "2026-02-15",
+    endDate: "2026-05-30",
+    budgetHours: 250,
+    resources: ["Alice", "Charlie"],
+    usedHours: 120,
+    phase: "Avslutat",
   },
 ];
