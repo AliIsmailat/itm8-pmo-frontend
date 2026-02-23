@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Folder, Users, Settings } from "lucide-react";
+import { Home, Folder, Users, Handshake } from "lucide-react";
 
 const Navbar: React.FC = () => {
   const username = "User";
@@ -13,7 +13,7 @@ const Navbar: React.FC = () => {
     { to: "/", label: "Start", icon: Home },
     { to: "/projects", label: "Projekt", icon: Folder },
     { to: "/resources", label: "Resurser", icon: Users },
-    { to: "/admin", label: "Admin", icon: Settings },
+    { to: "/customers", label: "Kunder", icon: Handshake },
   ];
 
   return (

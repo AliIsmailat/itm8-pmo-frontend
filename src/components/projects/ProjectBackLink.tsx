@@ -13,9 +13,9 @@ const ProjectBackLink: React.FC<ProjectBackLinkProps> = ({ href, label }) => {
       to={href}
       className={`
         inline-flex items-center gap-2 px-4 py-2
-        bg-gray-200 hover:bg-gray-300
-        text-black hover:text-gray-800
-        font-medium rounded-lg shadow-sm
+        bg-purple-600 hover:bg-purple-700
+        text-white hover:text-gray-100-
+        font-medium rounded-3xl shadow-sm
         transition-all duration-200 transform
         w-auto self-start
       `}

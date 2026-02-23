@@ -1,26 +1,30 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import PageHeader from "../components/ui/PageHeader";
-import ProjectTable from "../components/projects/ProjectTable";
-import { projects } from "../dummyProjects";
+import { useNavigate, useLocation } from "react-router-dom";
+import FilteredProjects from "../components/projects/FilteredProjects";
+import { projects as allProjects } from "../dummyProjects";
+import type { Project } from "../components/projects/ProjectTable";
+
+function useQuery() {
+  return new URLSearchParams(useLocation().search);
+}
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
+  const query = useQuery();
+  const customerId = query.get("customerId");
+
+  const filteredProjects: Project[] = customerId
+    ? allProjects.filter((p) => p.customerId === Number(customerId))
+    : allProjects;
+
+  const customerName = customerId ? filteredProjects[0]?.customer : undefined;
 
   return (
-    <div className="p-8 flex flex-col gap-8">
-      <PageHeader
-        title="Projekt"
-        description="Hantera alla projekt och resursfördelningar..."
-      />
-
-      <ProjectTable
-        projects={projects}
-        onSelect={(project) => {
-          navigate(`/projects/${project.id}`);
-        }}
-      />
-    </div>
+    <FilteredProjects
+      projects={filteredProjects}
+      customerName={customerName}
+      onSelectProject={(project) => navigate(`/projects/${project.id}`)}
+    />
   );
 };
 

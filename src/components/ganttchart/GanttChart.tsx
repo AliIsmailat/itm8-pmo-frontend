@@ -5,7 +5,6 @@ import { Plus } from "lucide-react";
 
 const WEEK_WIDTH = 24;
 const ROW_HEIGHT = 40;
-const HEADER_HEIGHT = 24;
 
 interface GanttChartProps {
   phases: Phase[];
@@ -16,6 +15,23 @@ interface NewPhase {
   startDate: string;
   endDate: string;
   status?: Phase["status"];
+}
+
+function getMonthSpans() {
+  return [
+    { name: "Jan", span: 4 },
+    { name: "Feb", span: 4 },
+    { name: "Mar", span: 5 },
+    { name: "Apr", span: 4 },
+    { name: "Maj", span: 4 },
+    { name: "Jun", span: 5 },
+    { name: "Jul", span: 4 },
+    { name: "Aug", span: 4 },
+    { name: "Sep", span: 5 },
+    { name: "Okt", span: 4 },
+    { name: "Nov", span: 4 },
+    { name: "Dec", span: 5 },
+  ];
 }
 
 const GanttChart: React.FC<GanttChartProps> = ({ phases: initialPhases }) => {
@@ -33,8 +49,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ phases: initialPhases }) => {
     endDate: "",
   });
 
-  const chartHeight = phases.length * ROW_HEIGHT;
   const currentWeek = getISOWeek();
+  const months = getMonthSpans();
+  const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
 
   const handleEdit = (phase: Phase) => {
     setSelectedPhase({
@@ -60,11 +77,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ phases: initialPhases }) => {
 
     const phaseToAdd: Phase = {
       name: newPhase.name,
+      startWeek,
+      duration: endWeek - startWeek + 1,
       usedWeeks,
       status: newPhase.status,
-      startWeek,
-      endWeek,
-    } as any;
+    };
 
     setPhases((prev) => [...prev, phaseToAdd]);
     setShowAddModal(false);
@@ -72,100 +89,100 @@ const GanttChart: React.FC<GanttChartProps> = ({ phases: initialPhases }) => {
   };
 
   return (
-    <div className="bg-gray-200 rounded-xl shadow p-6 overflow-x-auto relative">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="font-semibold">Tidsplan</h2>
-
+    <div className="rounded-xl bg-white shadow text-sm overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b">
+        <h2 className="font-semibold text-base">Tidsplan</h2>
         <div className="flex gap-2">
           <button
-            className="bg-purple-600 text-white px-4 py-1 rounded-md hover:bg-purple-700 flex items-center gap-1"
+            className="bg-purple-600 text-white px-3 py-1 rounded-md hover:bg-purple-700 flex items-center gap-1 text-base"
             onClick={() => setShowResourceModal(true)}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3 h-3" />
             Allokera resurser
           </button>
-
           <button
-            className="bg-purple-600 text-white px-4 py-1 rounded-md hover:bg-purple-700 flex items-center gap-1"
+            className="bg-purple-600 text-white px-3 py-1 rounded-md hover:bg-purple-700 flex items-center gap-1 text-base"
             onClick={() => setShowAddModal(true)}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3 h-3" />
             Lägg till fas
           </button>
         </div>
       </div>
 
-      <div className="flex">
-        <div className="w-40 flex flex-col gap-2 pt-12">
-          {phases.map((phase, idx) => (
+      <div className="overflow-x-auto">
+        {/* Month header row */}
+        <div
+          className="grid bg-gray-50 border-b"
+          style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
+        >
+          <div className="p-2 font-semibold border-r">Fas</div>
+          {months.map((m) => (
             <div
-              key={idx}
-              className="h-8 flex items-center text-sm font-medium underline"
+              key={m.name}
+              className="text-center border-l font-medium py-2"
+              style={{ gridColumn: `span ${m.span}` }}
             >
-              {phase.name}
+              {m.name}
             </div>
           ))}
         </div>
 
         <div
-          className="relative flex-1"
-          style={{ minWidth: `${52 * WEEK_WIDTH}px` }}
+          className="grid bg-gray-50 border-b"
+          style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
         >
-          <div className="flex h-[24px]">
-            {Array.from({ length: 52 }, (_, i) => (
-              <div
-                key={i}
-                className="w-[24px] text-center text-xs flex items-center justify-center border-r border-gray-200"
-              >
-                {i + 1}
-              </div>
-            ))}
-          </div>
+          <div className="border-r" />
+          {weeks.map((w) => (
+            <div
+              key={w}
+              className={`text-center border-l py-1 text-[13px] ${
+                w === currentWeek ? "bg-purple-200 font-bold" : ""
+              }`}
+            >
+              {w}
+            </div>
+          ))}
+        </div>
 
+        {phases.map((phase, idx) => (
           <div
-            className="relative"
-            style={{
-              height: `${chartHeight}px`,
-              marginTop: `${HEADER_HEIGHT}px`,
-            }}
+            key={idx}
+            className="grid relative border-t"
+            style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
           >
-            <div className="absolute top-0 left-0 flex h-full">
-              {Array.from({ length: 52 }, (_, i) => (
-                <div
-                  key={i}
-                  className="border-r border-b border-gray-400"
-                  style={{ width: `${WEEK_WIDTH}px` }}
-                />
-              ))}
+            <div
+              className="border-r px-3 py-1 flex items-center gap-2"
+              style={{ height: `${ROW_HEIGHT}px` }}
+            >
+              <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0" />
+              <div className="text-[14px] border-l pl-2 border-gray-300 font-medium truncate">
+                {phase.name}
+              </div>
             </div>
 
-            {phases.map((_, idx) => (
+            {weeks.map((w) => (
               <div
-                key={idx}
-                className="w-full border-b border-gray-400 absolute"
-                style={{ top: `${idx * ROW_HEIGHT}px` }}
+                key={w}
+                className={`border-l ${w === currentWeek ? "bg-purple-50" : ""}`}
+                style={{ height: `${ROW_HEIGHT}px` }}
               />
             ))}
 
             <div
-              className="absolute top-0 h-full bg-yellow-300 opacity-30 pointer-events-none"
-              style={{
-                left: `${(currentWeek - 1) * WEEK_WIDTH}px`,
-                width: `${WEEK_WIDTH}px`,
-              }}
-            />
-
-            {phases.map((phase, idx) => (
+              className="absolute top-0 bottom-0"
+              style={{ left: `160px`, right: 0 }}
+            >
               <PhaseBlock
-                key={idx}
                 {...phase}
-                top={idx * ROW_HEIGHT}
+                top={0}
                 weekWidth={WEEK_WIDTH}
                 onEdit={handleEdit}
               />
-            ))}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
       {selectedPhase && (
@@ -274,7 +291,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ phases: initialPhases }) => {
                 Avbryt
               </button>
               <button
-                className="px-4 py-1 bg-blue-600 text-white rounded"
+                className="px-4 py-1 bg-purple-600 text-white rounded"
                 onClick={handleAddPhase}
               >
                 Lägg till

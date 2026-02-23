@@ -1,6 +1,7 @@
 import React from "react";
 import { Search, Plus } from "lucide-react";
 import type { ProjectFilterState } from "./projectFilters";
+import ViewSwitch from "./ViewSwitch";
 
 interface Props {
   query: string;
@@ -8,6 +9,9 @@ interface Props {
   filters: ProjectFilterState;
   onFilterChange: (f: ProjectFilterState) => void;
   onAdd?: () => void;
+
+  view: "table" | "grid";
+  onViewChange: (v: "table" | "grid") => void;
 }
 
 const ProjectActions: React.FC<Props> = ({
@@ -16,6 +20,8 @@ const ProjectActions: React.FC<Props> = ({
   filters,
   onFilterChange,
   onAdd,
+  view,
+  onViewChange,
 }) => {
   return (
     <div className="flex flex-col gap-3 mb-6">
@@ -33,11 +39,12 @@ const ProjectActions: React.FC<Props> = ({
 
         <button
           onClick={onAdd}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 transition"
         >
           Lägg till projekt
           <Plus className="w-4 h-4" />
         </button>
+        <ViewSwitch view={view} onChange={onViewChange} />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -75,7 +82,7 @@ const ProjectActions: React.FC<Props> = ({
             onQueryChange("");
             onFilterChange({});
           }}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-lg"
+          className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-lg transition"
         >
           Rensa filter
         </button>

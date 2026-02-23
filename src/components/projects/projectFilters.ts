@@ -3,8 +3,6 @@ import type { Project } from "./ProjectTable";
 export interface ProjectFilterState {
   startDate?: string;
   endDate?: string;
-//   minBudget?: number;
-//   maxBudget?: number;
   phase?: string;
 }
 
