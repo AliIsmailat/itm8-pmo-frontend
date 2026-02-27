@@ -1,35 +1,16 @@
 import React, { useState } from "react";
 import PageHeader from "../components/ui/PageHeader";
-import CustomerActions from "../components/customers/CustomerActions";
-import CustomerList from "../components/customers/CustomerList";
-import type { Customer } from "../components/customers/CustomerList";
-import { projects } from "../dummyProjects";
-
-const customerMap: Record<number, Customer> = {};
-
-projects.forEach((p) => {
-  const isOngoing = p.phase === "Planering" || p.phase === "Pågående";
-  if (p.customerId != null) {
-    if (!customerMap[p.customerId]) {
-      customerMap[p.customerId] = {
-        id: p.customerId,
-        name: p.customer,
-        ongoingProjects: isOngoing ? 1 : 0,
-      };
-    } else {
-      customerMap[p.customerId].ongoingProjects += isOngoing ? 1 : 0;
-    }
-  }
-});
-
-const dummyCustomers: Customer[] = Object.values(customerMap);
+import CustomerActionsContainer from "../components/customers/CustomerActionsContainer";
+import CustomerListContainer from "../components/customers/CustomerListContainer";
 
 const Customers: React.FC = () => {
   const [search, setSearch] = useState("");
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
-  const filteredCustomers = dummyCustomers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const handleClientCreated = () => {
+    // Öka räknaren → CustomerListContainer reagerar och fetchar om
+    setRefetchTrigger((prev) => prev + 1);
+  };
 
   return (
     <div className="p-8 flex flex-col gap-8">
@@ -38,12 +19,9 @@ const Customers: React.FC = () => {
         description="Hantera kunder och deras projekt..."
       />
 
-      <CustomerActions
-        onAdd={() => alert("Lägg till kund")}
-        onSearch={setSearch}
-      />
+      <CustomerActionsContainer onClientCreated={handleClientCreated} />
 
-      <CustomerList customers={filteredCustomers} />
+      <CustomerListContainer search={search} refetchTrigger={refetchTrigger} />
     </div>
   );
 };

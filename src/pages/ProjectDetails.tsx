@@ -4,8 +4,8 @@ import PageHeader from "../components/ui/PageHeader";
 import ProjectInfo from "../components/projects/ProjectInfo";
 import GanttChart from "../components/ganttchart/GanttChart";
 import ProjectBackLink from "../components/projects/ProjectBackLink";
-import ResourceTable from "../components/resources/ResourceTable";
-import type { Resource } from "../components/resources/ResourceTable"; // type-only import
+// import ResourceTable from "../components/resources/ResourceTable";
+// import type { Resource } from "../components/resources/ResourceTable"; // type-only import
 import type { Phase } from "../components/ganttchart/PhaseBlock";
 import { projects } from "../dummyProjects";
 
@@ -45,22 +45,22 @@ const ProjectDetails: React.FC = () => {
     },
   ];
 
-  const resources: Resource[] = [
-    {
-      id: 1,
-      name: "Alice",
-      role: "Projektledare",
-      ongoingProjects: 2,
-      capacity: 80,
-    },
-    {
-      id: 2,
-      name: "Bob",
-      role: "Utvecklare",
-      ongoingProjects: 1,
-      capacity: 40,
-    },
-  ];
+  // const resources: Resource[] = [
+  //   {
+  //     id: 1,
+  //     name: "Alice",
+  //     role: "Projektledare",
+  //     ongoingProjects: 2,
+  //     capacity: 80,
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Bob",
+  //     role: "Utvecklare",
+  //     ongoingProjects: 1,
+  //     capacity: 40,
+  //   },
+  // ];
 
   return (
     <div className="p-8 flex flex-col gap-8">
@@ -71,7 +71,7 @@ const ProjectDetails: React.FC = () => {
 
       <ProjectBackLink href="/projects" label="Tillbaka till projekt" />
       <ProjectInfo project={project} />
-      <ResourceTable resources={resources} />
+      {/* <ResourceTable resources={resources} /> */}
 
       <GanttChart phases={phases} />
     </div>
