@@ -1,5 +1,5 @@
 import React from "react";
-import { ListOrdered, Table } from "lucide-react";
+import { List, GanttChartSquare } from "lucide-react";
 
 interface Props {
   view: "table" | "grid";
@@ -8,34 +8,27 @@ interface Props {
 
 const ViewSwitch: React.FC<Props> = ({ view, onChange }) => {
   return (
-    <div className="inline-flex rounded-xl border bg-white shadow-sm overflow-hidden">
+    <div className="flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-1 gap-1">
       <button
         onClick={() => onChange("table")}
-        className={`
-          flex items-center gap-2 px-4 py-2 text-md font-medium transition
-          ${
-            view === "table"
-              ? "bg-purple-600 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-100"
-          }
-        `}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+          view === "table"
+            ? "bg-purple-600 text-white shadow-sm"
+            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+        }`}
       >
-        <ListOrdered size={18} />
+        <List className="w-4 h-4" />
         Tabell
       </button>
-
       <button
         onClick={() => onChange("grid")}
-        className={`
-          flex items-center gap-2 px-4 py-2 text-md font-medium transition
-          ${
-            view === "grid"
-              ? "bg-purple-600 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-100"
-          }
-        `}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+          view === "grid"
+            ? "bg-purple-600 text-white shadow-sm"
+            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+        }`}
       >
-        <Table size={18} />
+        <GanttChartSquare className="w-4 h-4" />
         Tidslinje
       </button>
     </div>

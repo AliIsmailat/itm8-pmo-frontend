@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  MoreVertical,
-  Mail,
-  Phone,
-  MapPin,
-  FolderOpen,
-  User,
-} from "lucide-react";
+import { MoreVertical, Mail, Phone, MapPin, FolderOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -16,9 +9,8 @@ interface Props {
   phoneNumber: string;
   email: string;
   ongoingProjects: number;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 const CustomerCard: React.FC<Props> = ({
@@ -28,9 +20,8 @@ const CustomerCard: React.FC<Props> = ({
   phoneNumber,
   email,
   ongoingProjects,
-  contactName,
-  contactEmail,
-  contactPhone,
+  onEdit,
+  onDelete,
 }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -38,17 +29,12 @@ const CustomerCard: React.FC<Props> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node))
         setOpen(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleClick = () => {
-    navigate(`/projects?customerId=${id}`);
-  };
 
   const initials = name
     .split(" ")
@@ -60,7 +46,7 @@ const CustomerCard: React.FC<Props> = ({
   return (
     <div
       className="relative w-[22rem] cursor-pointer group"
-      onClick={handleClick}
+      onClick={() => navigate(`/projects?customerId=${id}`)}
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
       <div className="bg-gray-100 rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-100">
@@ -68,7 +54,6 @@ const CustomerCard: React.FC<Props> = ({
           <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-base shrink-0 shadow-sm">
             {initials}
           </div>
-
           <div className="flex-1 min-w-0">
             <p className="text-gray-900 font-semibold text-base leading-tight truncate">
               {name}
@@ -77,25 +62,37 @@ const CustomerCard: React.FC<Props> = ({
               Kund #{id}
             </p>
           </div>
-
           <div ref={menuRef} className="relative shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setOpen((prev) => !prev);
+                setOpen((p) => !p);
               }}
               className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
-
             {open && (
               <div className="absolute right-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
-                <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onEdit();
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
                   Redigera
                 </button>
                 <div className="h-px bg-gray-100 mx-3" />
-                <button className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onDelete();
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                >
                   Ta bort
                 </button>
               </div>
@@ -106,57 +103,23 @@ const CustomerCard: React.FC<Props> = ({
         <div className="h-px bg-gray-100 mx-5" />
 
         <div className="px-5 py-4 flex flex-col gap-3">
-          {/* Kundinfo */}
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
               <Mail className="w-3.5 h-3.5 text-gray-500" />
             </div>
             <span className="text-sm text-gray-600 truncate">{email}</span>
           </div>
-
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
               <Phone className="w-3.5 h-3.5 text-gray-500" />
             </div>
             <span className="text-sm text-gray-600">{phoneNumber}</span>
           </div>
-
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
               <MapPin className="w-3.5 h-3.5 text-gray-500" />
             </div>
             <span className="text-sm text-gray-600 truncate">{address}</span>
-          </div>
-
-          {/* Kontaktperson */}
-          <div className="h-px bg-gray-100 my-1" />
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Kontaktperson
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-              <User className="w-3.5 h-3.5 text-gray-500" />
-            </div>
-            <span className="text-sm text-gray-600 truncate">
-              {contactName}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-              <Mail className="w-3.5 h-3.5 text-gray-500" />
-            </div>
-            <span className="text-sm text-gray-600 truncate">
-              {contactEmail}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-              <Phone className="w-3.5 h-3.5 text-gray-500" />
-            </div>
-            <span className="text-sm text-gray-600">{contactPhone}</span>
           </div>
         </div>
 

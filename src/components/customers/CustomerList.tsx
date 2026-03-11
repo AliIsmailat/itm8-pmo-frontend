@@ -8,20 +8,24 @@ export interface Customer {
   phoneNumber: string;
   email: string;
   ongoingProjects: number;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
 }
 
 interface Props {
   customers: Customer[];
+  onEdit: (customer: Customer) => void;
+  onDelete: (customer: Customer) => void;
 }
 
-const CustomerList: React.FC<Props> = ({ customers }) => {
+const CustomerList: React.FC<Props> = ({ customers, onEdit, onDelete }) => {
   return (
     <div className="flex flex-wrap justify-center gap-10">
       {customers.map((c) => (
-        <CustomerCard key={c.id} {...c} />
+        <CustomerCard
+          key={c.id}
+          {...c}
+          onEdit={() => onEdit(c)}
+          onDelete={() => onDelete(c)}
+        />
       ))}
     </div>
   );

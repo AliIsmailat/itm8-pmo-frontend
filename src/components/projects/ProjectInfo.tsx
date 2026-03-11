@@ -1,32 +1,59 @@
 import React from "react";
-import type { Project } from "./ProjectTable";
-interface ProjectInfoProps {
+import { Pencil } from "lucide-react";
+import type { Project } from "../../utils/projects";
+
+interface Props {
   project: Project;
+  onEdit: () => void;
 }
 
-const ProjectInfo: React.FC<ProjectInfoProps> = ({ project }) => {
-  return (
-    <div className="grid grid-cols-2 gap-6 bg-gray-200 p-6 rounded-xl shadow">
-      <div>
-        <span className="font-medium">Kund:</span> {project.customer}
-      </div>
+const fmt = (d: string) => (d ? new Date(d).toLocaleDateString("sv-SE") : "—");
 
-      <div>
-        <span className="font-medium">Budget (h):</span> {project.budgetHours}
+const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="flex flex-col gap-0.5">
+    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+      {label}
+    </span>
+    <span className="text-sm text-gray-800">{value || "—"}</span>
+  </div>
+);
+
+const ProjectInfo: React.FC<Props> = ({ project, onEdit }) => {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-sm font-semibold text-gray-700">
+          Projektinformation
+        </h2>
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-purple-600 border border-gray-200 hover:border-purple-300 px-3 py-1.5 rounded-lg transition"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+          Redigera
+        </button>
       </div>
-      <div>
-        <span className="font-medium">Start:</span> {project.startDate}
-      </div>
-      <div>
-        <span className="font-medium">Förbrukade timmar:</span>{" "}
-        {project.usedHours}
-      </div>
-      <div>
-        <span className="font-medium">Slut:</span> {project.endDate}
-      </div>
-      <div>
-        <span className="font-medium">Resurser:</span>{" "}
-        {project.resources.join(", ")}
+      <div className="grid grid-cols-2 gap-x-10 gap-y-5">
+        <div className="col-span-2">
+          <Field label="Projektnamn" value={project.name} />
+        </div>
+        <Field label="Kund" value={project.client?.name} />
+        <Field label="Projektledare" value={project.projectLeader?.name} />
+        <Field label="Startdatum" value={fmt(project.startDate)} />
+        <Field label="Slutdatum" value={fmt(project.endDate)} />
+        <Field label="Totala timmar" value={`${project.totalHours}h`} />
+        <Field
+          label="Allokerade timmar"
+          value={`${project.allocatedHours ?? 0}h`}
+        />
+        <Field
+          label="Kontaktpersoner"
+          value={
+            project.contactPersons?.length > 0
+              ? project.contactPersons.map((cp) => cp.name).join(", ")
+              : "—"
+          }
+        />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/clients";
-const CONTACT_URL = "http://localhost:5000/api/contactPersons";
+const API_URL = "http://localhost:5000/api/Clients";
+const DELETIONS_URL = "http://localhost:5000/api/Deletions";
 
 export interface Client {
   id: number;
@@ -9,10 +9,8 @@ export interface Client {
   address: string;
   phoneNumber: string;
   email: string;
-  ongoingProjects?: number;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
+  projectCount?: number;
+  projects?: { id: number; name: string }[];
 }
 
 export interface ContactPerson {
@@ -32,27 +30,52 @@ export const getContactPersonByClientId = async (
 ): Promise<ContactPerson | null> => {
   try {
     const res = await axios.get<ContactPerson[]>(
-      `${CONTACT_URL}/by-client/${clientId}`,
+      `http://localhost:5000/api/ContactPersons/by-client/${clientId}`,
     );
-    return res.data[0] ?? null;
+    return res.data?.[0] ?? null;
   } catch {
     return null;
   }
 };
 
-export const createClient = async (data: {
-  client: {
-    name: string;
-    address: string;
-    phoneNumber: string;
-    email: string;
-  };
-  contactPerson: {
-    name: string;
-    email: string;
-    phoneNumber: string;
-  };
-}): Promise<Client> => {
-  const res = await axios.post<Client>(API_URL, data);
-  return res.data;
+export const updateClient = async (
+  id: number,
+  data: Omit<Client, "id" | "projectCount" | "projects">,
+): Promise<void> => {
+  await axios.put(`${API_URL}/${id}`, data);
+};
+
+export const deleteClient = async (id: number): Promise<void> => {
+  try {
+    await axios.post(
+      `${DELETIONS_URL}/client/${id}`,
+      { gracePeriodMinutes: 1440 },
+      { headers: { "Content-Type": "application/json" } },
+    );
+  } catch (err: unknown) {
+    const message = axios.isAxiosError(err) ? err.response?.data : err;
+    console.error("Delete client error:", message);
+    throw err;
+  }
+};
+
+export const updateContactPerson = async (
+  id: number,
+  data: { name: string; email: string; phoneNumber: string },
+): Promise<void> => {
+  await axios.put(`http://localhost:5000/api/ContactPersons/${id}`, data);
+};
+
+export const deleteContactPerson = async (id: number): Promise<void> => {
+  try {
+    await axios.post(
+      `http://localhost:5000/api/Deletions/contactperson/${id}`,
+      { gracePeriodMinutes: 1440 },
+      { headers: { "Content-Type": "application/json" } },
+    );
+  } catch (err: unknown) {
+    const message = axios.isAxiosError(err) ? err.response?.data : err;
+    console.error("Delete contact person error:", message);
+    throw err;
+  }
 };

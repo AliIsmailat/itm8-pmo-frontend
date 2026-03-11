@@ -1,5 +1,6 @@
 import React from "react";
-import type { Project } from "./ProjectTable";
+import { useNavigate } from "react-router-dom";
+import type { Project } from "../../utils/projects";
 
 interface Props {
   projects: Project[];
@@ -11,7 +12,7 @@ function getWeek(dateStr: string) {
   const date = new Date(dateStr);
   const start = new Date(date.getFullYear(), 0, 1);
   const diff = +date - +start;
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 7)) + 1;
+  return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24 * 7)) + 1);
 }
 
 function getCurrentWeek() {
@@ -39,7 +40,10 @@ function getMonthSpans() {
 }
 
 const GridView: React.FC<Props> = ({ projects }) => {
-  const customers = Array.from(new Set(projects.map((p) => p.customer)));
+  const navigate = useNavigate();
+  const clients = Array.from(
+    new Set(projects.map((p) => p.client?.name ?? "Okänd kund")),
+  );
   const months = getMonthSpans();
   const currentWeek = getCurrentWeek();
 
@@ -50,7 +54,6 @@ const GridView: React.FC<Props> = ({ projects }) => {
         style={{ gridTemplateColumns: `160px repeat(52, 1fr)` }}
       >
         <div className="p-2 font-semibold border-r">Kund</div>
-
         {months.map((m) => (
           <div
             key={m.name}
@@ -67,7 +70,6 @@ const GridView: React.FC<Props> = ({ projects }) => {
         style={{ gridTemplateColumns: `160px repeat(52, 1fr)` }}
       >
         <div className="border-r" />
-
         {weeks.map((w) => (
           <div
             key={w}
@@ -80,29 +82,27 @@ const GridView: React.FC<Props> = ({ projects }) => {
         ))}
       </div>
 
-      {customers.map((customer) => {
-        const customerProjects = projects.filter(
-          (p) => p.customer === customer,
+      {clients.map((client) => {
+        const clientProjects = projects.filter(
+          (p) => (p.client?.name ?? "Okänd kund") === client,
         );
 
         return (
-          <div key={customer}>
+          <div key={client}>
             <div
               className="grid bg-gray-50 border-t"
               style={{ gridTemplateColumns: `160px repeat(52, 1fr)` }}
             >
-              <div className="p-2 border-r font-bold">{customer}</div>
+              <div className="p-2 border-r font-bold">{client}</div>
               {weeks.map((w) => (
                 <div
                   key={w}
-                  className={`border-l h-6 ${
-                    w === currentWeek ? "bg-purple-50" : ""
-                  }`}
+                  className={`border-l h-6 ${w === currentWeek ? "bg-purple-50" : ""}`}
                 />
               ))}
             </div>
 
-            {customerProjects.map((p) => {
+            {clientProjects.map((p) => {
               const start = getWeek(p.startDate);
               const end = getWeek(p.endDate);
 
@@ -110,31 +110,28 @@ const GridView: React.FC<Props> = ({ projects }) => {
                 <div
                   key={p.id}
                   className="grid relative border-t"
-                  style={{
-                    gridTemplateColumns: `160px repeat(52, 1fr)`,
-                  }}
+                  style={{ gridTemplateColumns: `160px repeat(52, 1fr)` }}
                 >
                   <div className="border-r px-3 py-1 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                    <div className="text-[13px] border-l pl-2 border-gray-300">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full shrink-0" />
+                    <button
+                      onClick={() => navigate(`/projects/${p.id}`)}
+                      className="text-[13px] border-l pl-2 border-gray-300 truncate text-left hover:text-purple-600 transition-colors"
+                    >
                       {p.name}
-                    </div>
+                    </button>
                   </div>
 
                   {weeks.map((w) => (
                     <div
                       key={w}
-                      className={`border-l h-8 ${
-                        w === currentWeek ? "bg-purple-50" : ""
-                      }`}
+                      className={`border-l h-8 ${w === currentWeek ? "bg-purple-50" : ""}`}
                     />
                   ))}
 
                   <div
                     className="absolute left-[160px] right-0 top-0 bottom-0 grid items-center pointer-events-none"
-                    style={{
-                      gridTemplateColumns: `repeat(52, 1fr)`,
-                    }}
+                    style={{ gridTemplateColumns: `repeat(52, 1fr)` }}
                   >
                     <div
                       style={{ gridColumn: `${start} / ${end + 1}` }}

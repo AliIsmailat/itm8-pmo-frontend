@@ -5,9 +5,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  width?: string;
 }
 
-const Modal: React.FC<Props> = ({ isOpen, onClose, children }) => {
+const Modal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  children,
+  width = "w-[26rem]",
+}) => {
   const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -56,13 +62,11 @@ const Modal: React.FC<Props> = ({ isOpen, onClose, children }) => {
       `}</style>
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl relative overflow-hidden w-[26rem]"
+        className={`bg-white rounded-2xl shadow-2xl relative overflow-hidden ${width}`}
         style={{ animation: "modalSlideIn 0.2s ease-out" }}
       >
-        {/* Purple top accent */}
         <div className="h-1 w-full bg-purple-600" />
 
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -70,7 +74,7 @@ const Modal: React.FC<Props> = ({ isOpen, onClose, children }) => {
           <X className="w-4 h-4" />
         </button>
 
-        <div className="p-6">{children}</div>
+        <div className="p-7">{children}</div>
       </div>
     </div>
   );
