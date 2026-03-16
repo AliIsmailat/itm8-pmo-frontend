@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import axios from "axios";
 import { saveToken } from "../../utils/auth";
@@ -18,10 +18,13 @@ const LoginForm: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/Auth/login", {
-        email,
-        password,
-      });
+      const res = await axios.post(
+        "https://itm8-pmo-system-api-dtb5fxa6cxbmagez.swedencentral-01.azurewebsites.net/api/Auth/login",
+        {
+          email,
+          password,
+        },
+      );
       saveToken(res.data.token, rememberMe);
       navigate("/");
     } catch (err) {
@@ -114,16 +117,6 @@ const LoginForm: React.FC = () => {
           {loading ? "Loggar in..." : "Logga in"}
         </button>
       </div>
-
-      <p className="text-center text-sm text-gray-500">
-        Inget konto?{" "}
-        <Link
-          to="/register"
-          className="font-semibold text-purple-600 hover:text-purple-700 transition"
-        >
-          Registrera dig
-        </Link>
-      </p>
     </div>
   );
 };
