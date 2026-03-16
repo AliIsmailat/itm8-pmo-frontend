@@ -1,0 +1,64 @@
+trigger:
+  branches:
+    include:
+      - frontend-main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: PMO-System-Secrets
+  - name: NODE_VERSION
+    value: '20.x'
+
+stages:
+  - stage: Build
+    displayName: 'Build Frontend'
+    jobs:
+      - job: BuildJob
+        displayName: 'Install & Build'
+        steps:
+          - task: UseNode@1
+            inputs:
+              version: $(NODE_VERSION)
+            displayName: 'Use Node $(NODE_VERSION)'
+
+          - script: node --version && npm --version
+            displayName: 'Verify Node and npm versions'
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/PMO.Tool'
+
+          - script: npm run build
+            displayName: 'Build Vite app'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/PMO.Tool'
+            env:
+              VITE_API_URL: $(VITE_API_URL)
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(System.DefaultWorkingDirectory)/PMO.Tool/dist'
+              ArtifactName: 'dist'
+            displayName: 'Publish build artifact'
+
+  - stage: Deploy
+    displayName: 'Deploy to Azure Static Web Apps'
+    dependsOn: Build
+    jobs:
+      - job: DeployJob
+        displayName: 'Deploy'
+        steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              artifactName: 'dist'
+              downloadPath: '$(System.DefaultWorkingDirectory)'
+            displayName: 'Download build artifact'
+
+          - task: AzureStaticWebApp@0
+            inputs:
+              app_location: 'dist'
+              skip_app_build: true
+              azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN)
+            displayName: 'Deploy to Static Web App'
