@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import PhaseBlock from "./PhaseBlock";
 import type { Phase } from "./PhaseBlock";
@@ -12,13 +12,15 @@ const WEEK_WIDTH = 24;
 const ROW_HEIGHT = 40;
 
 interface GanttPhase extends Phase {
-  id?: number;
+  id: number;
+  startDate: string;
+  endDate: string;
   allocatedResourceIds?: number[];
 }
 
 interface GanttChartProps {
   phases: GanttPhase[];
-  projectId?: number;
+  projectId: number;
   onPhasesChanged?: () => void;
 }
 
@@ -26,6 +28,17 @@ interface PhaseFormData {
   name: string;
   startDate: string;
   endDate: string;
+}
+
+interface DragState {
+  phaseIdx: number;
+  type: "move" | "resize-left" | "resize-right";
+  startX: number;
+  originalStartWeek: number;
+  originalDuration: number;
+  originalStartDate: string;
+  originalEndDate: string;
+  phaseYear: number;
 }
 
 function getMonthSpans() {
@@ -46,28 +59,51 @@ function getMonthSpans() {
 }
 
 function getISOWeek(date: Date = new Date()): number {
-  const d = new Date(date.getTime());
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
+  const d = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+  const week1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
   return (
     1 +
     Math.round(
       ((d.getTime() - week1.getTime()) / 86400000 -
         3 +
-        ((week1.getDay() + 6) % 7)) /
+        ((week1.getUTCDay() + 6) % 7)) /
         7,
     )
   );
 }
 
-function weekToDate(week: number, year = new Date().getFullYear()): string {
-  const jan4 = new Date(year, 0, 4);
+function weekToDate(week: number, year = new Date().getUTCFullYear()): string {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
   const startOfWeek1 = new Date(jan4);
-  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  startOfWeek1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
   const d = new Date(startOfWeek1);
-  d.setDate(d.getDate() + (week - 1) * 7);
+  d.setUTCDate(d.getUTCDate() + (week - 1) * 7);
   return d.toISOString();
+}
+
+function weekToEndDate(
+  week: number,
+  year = new Date().getUTCFullYear(),
+): string {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+  const d = new Date(startOfWeek1);
+  d.setUTCDate(d.getUTCDate() + (week - 1) * 7 + 6);
+  return d.toISOString();
+}
+
+function phasesOverlap(
+  aStart: number,
+  aDuration: number,
+  bStart: number,
+  bDuration: number,
+): boolean {
+  // Intervals are [start, start+duration) — exclusive end
+  return aStart < bStart + bDuration && bStart < aStart + aDuration;
 }
 
 const inputClass =
@@ -90,6 +126,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [yearClampError, setYearClampError] = useState<string | null>(null);
+
+  // Drag state
+  const dragRef = useRef<DragState | null>(null);
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const hasDraggedRef = useRef(false);
 
   // Resource allocation state
   const [allResources, setAllResources] = useState<Resource[]>([]);
@@ -111,29 +153,310 @@ const GanttChart: React.FC<GanttChartProps> = ({
     setPhases(initialPhases);
   }, [initialPhases]);
 
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+
+  const handleDragStart = useCallback(
+    (
+      phaseIdx: number,
+      type: "move" | "resize-left" | "resize-right",
+      clientX: number,
+    ) => {
+      const phase = phases[phaseIdx];
+      dragRef.current = {
+        phaseIdx,
+        type,
+        startX: clientX,
+        originalStartWeek: phase.startWeek,
+        originalDuration: phase.duration,
+        originalStartDate: phase.startDate,
+        originalEndDate: phase.endDate,
+        phaseYear: (() => {
+          const mid = new Date(
+            (new Date(phase.startDate).getTime() +
+              new Date(phase.endDate).getTime()) /
+              2,
+          );
+          return mid.getUTCFullYear();
+        })(),
+      };
+      hasDraggedRef.current = false;
+      setDraggingIdx(phaseIdx);
+    },
+    [phases],
+  );
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    const {
+      phaseIdx,
+      type,
+      startX,
+      originalStartWeek,
+      originalDuration,
+      phaseYear,
+    } = dragRef.current;
+    const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
+    if (deltaWeeks === 0) return;
+    hasDraggedRef.current = true;
+
+    // Clamp to weeks that keep the phase within its original year, max 52
+    const yearStart = getISOWeek(new Date(Date.UTC(phaseYear, 0, 4)));
+    const minWeek = yearStart;
+    const maxWeek = 52; // Gantt only renders 52 columns
+
+    setPhases((prev) => {
+      const updated = [...prev];
+      const phase = { ...updated[phaseIdx] };
+
+      if (type === "move") {
+        const rawStart = originalStartWeek + deltaWeeks;
+        const clampedStart = Math.min(
+          Math.max(minWeek, rawStart),
+          maxWeek - originalDuration + 1,
+        );
+        phase.startWeek = clampedStart;
+        if (clampedStart !== rawStart) {
+          setYearClampError(
+            `Faser kan inte flyttas utanför sitt år (${phaseYear})`,
+          );
+        } else {
+          setYearClampError(null);
+        }
+      } else if (type === "resize-right") {
+        phase.duration = Math.min(
+          Math.max(1, originalDuration + deltaWeeks),
+          maxWeek - phase.startWeek + 1,
+        );
+      } else if (type === "resize-left") {
+        const newStart = Math.max(minWeek, originalStartWeek + deltaWeeks);
+        const newDuration = Math.max(
+          1,
+          originalDuration - (newStart - originalStartWeek),
+        );
+        phase.startWeek = newStart;
+        phase.duration = newDuration;
+      }
+
+      updated[phaseIdx] = phase;
+      return updated;
+    });
+  }, []);
+
+  const handleMouseUp = useCallback(async () => {
+    if (!dragRef.current) return;
+    const {
+      phaseIdx,
+      type,
+      originalStartWeek,
+      originalDuration,
+      originalStartDate,
+      originalEndDate,
+    } = dragRef.current;
+    dragRef.current = null;
+    setDraggingIdx(null);
+
+    const phase = phases[phaseIdx];
+    const didMove =
+      phase.startWeek !== originalStartWeek ||
+      phase.duration !== originalDuration;
+
+    // Check overlap against all other phases
+    const hasOverlap = phases.some((other, idx) => {
+      if (idx === phaseIdx) return false;
+      return phasesOverlap(
+        phase.startWeek,
+        phase.duration,
+        other.startWeek,
+        other.duration,
+      );
+    });
+
+    if (hasOverlap) {
+      setPhases((prev) => {
+        const updated = [...prev];
+        updated[phaseIdx] = {
+          ...updated[phaseIdx],
+          startWeek: originalStartWeek,
+          duration: originalDuration,
+        };
+        return updated;
+      });
+      return;
+    }
+
+    // Only save if actually moved
+    if (!didMove) return;
+
+    const startWeekDelta = phase.startWeek - originalStartWeek;
+    const durationDelta = phase.duration - originalDuration;
+    const startDayDelta = startWeekDelta * 7;
+    const durationDayDelta = durationDelta * 7;
+
+    // Calculate new dates based on drag type
+    const newStart = new Date(originalStartDate);
+    const newEnd = new Date(originalEndDate);
+
+    if (type === "move") {
+      // Both dates shift by same amount
+      newStart.setUTCDate(newStart.getUTCDate() + startDayDelta);
+      newEnd.setUTCDate(newEnd.getUTCDate() + startDayDelta);
+    } else if (type === "resize-right") {
+      // Only end date changes
+      newEnd.setUTCDate(newEnd.getUTCDate() + durationDayDelta);
+    } else if (type === "resize-left") {
+      // Start shifts, end stays fixed
+      newStart.setUTCDate(newStart.getUTCDate() + startDayDelta);
+    }
+
+    const newStartDate = newStart.toISOString();
+    const newEndDate = newEnd.toISOString();
+
+    // Check actual date overlap against all other phases using real DB dates
+    const hasDateOverlap = phases.some((p, i) => {
+      if (i === phaseIdx) return false;
+      return new Date(p.startDate) < newEnd && new Date(p.endDate) > newStart;
+    });
+
+    console.log("Drag attempt:", {
+      name: phase.name,
+      type,
+      startWeekDelta,
+      durationDelta,
+      newStartDate,
+      newEndDate,
+      hasDateOverlap,
+      conflictsWith: phases
+        .filter(
+          (p, i) =>
+            i !== phaseIdx &&
+            new Date(p.startDate) < newEnd &&
+            new Date(p.endDate) > newStart,
+        )
+        .map((p) => ({
+          name: p.name,
+          startDate: p.startDate,
+          endDate: p.endDate,
+        })),
+    });
+
+    if (hasDateOverlap) {
+      setPhases((prev) => {
+        const updated = [...prev];
+        updated[phaseIdx] = {
+          ...updated[phaseIdx],
+          startWeek: originalStartWeek,
+          duration: originalDuration,
+        };
+        return updated;
+      });
+      return;
+    }
+
+    // Save to backend — don't call onPhasesChanged to avoid reorder from refetch
+    try {
+      console.log("Saving:", {
+        id: phase.id,
+        name: phase.name,
+        type,
+        newStartDate,
+        newEndDate,
+      });
+      await updatePhase(phase.id, {
+        name: phase.name,
+        startDate: newStartDate,
+        endDate: newEndDate,
+      });
+      // Update stored dates on the phase so future drags use correct originals
+      if (didMove) {
+        setPhases((prev) => {
+          const updated = [...prev];
+          updated[phaseIdx] = {
+            ...updated[phaseIdx],
+            startDate: newStartDate,
+            endDate: newEndDate,
+          };
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to save phase drag:", err);
+      if (axios.isAxiosError(err))
+        console.error("Drag save response:", err.response?.data);
+      setPhases((prev) => {
+        const updated = [...prev];
+        updated[phaseIdx] = {
+          ...updated[phaseIdx],
+          startWeek: originalStartWeek,
+          duration: originalDuration,
+        };
+        return updated;
+      });
+    }
+  }, [phases]);
+
+  // ── Edit / save ────────────────────────────────────────────────────────────
+
+  const anyModalOpen =
+    !!selectedPhase ||
+    showAddModal ||
+    showResourceModal ||
+    deleteConfirmId !== null;
+
+  useEffect(() => {
+    if (anyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [anyModalOpen]);
+
   const handleEdit = (phase: GanttPhase) => setSelectedPhase({ ...phase });
 
   const handleSave = async () => {
     if (!selectedPhase) return;
     setSaving(true);
     try {
-      if (projectId && selectedPhase.id) {
-        await updatePhase(selectedPhase.id, {
-          name: selectedPhase.name,
-          startDate: weekToDate(selectedPhase.startWeek),
-          endDate: weekToDate(
-            selectedPhase.startWeek + selectedPhase.duration - 1,
-          ),
-        });
-        onPhasesChanged?.();
-      } else {
-        setPhases((prev) =>
-          prev.map((p) => (p.name === selectedPhase.name ? selectedPhase : p)),
-        );
-      }
+      const original = phases.find((p) => p.id === selectedPhase.id);
+      const weeksChanged =
+        !original ||
+        original.startWeek !== selectedPhase.startWeek ||
+        original.duration !== selectedPhase.duration;
+
+      await updatePhase(selectedPhase.id, {
+        name: selectedPhase.name,
+        startDate: weeksChanged
+          ? weekToDate(selectedPhase.startWeek)
+          : selectedPhase.startDate,
+        endDate: weeksChanged
+          ? weekToEndDate(
+              Math.min(
+                52,
+                selectedPhase.startWeek + selectedPhase.duration - 1,
+              ),
+            )
+          : selectedPhase.endDate,
+      });
+      if (weeksChanged) onPhasesChanged?.();
+      setPhases((prev) =>
+        prev.map((p) =>
+          p.id === selectedPhase.id
+            ? {
+                ...p,
+                name: selectedPhase.name,
+                usedWeeks: selectedPhase.usedWeeks,
+                status: selectedPhase.status,
+              }
+            : p,
+        ),
+      );
       setSelectedPhase(null);
     } catch (err) {
       console.error("Failed to update phase:", err);
+      if (axios.isAxiosError(err))
+        console.error("Response:", err.response?.data);
       alert("Kunde inte uppdatera fasen.");
     } finally {
       setSaving(false);
@@ -156,27 +479,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
     setFormError(null);
     setSaving(true);
     try {
-      if (projectId) {
-        const phasePayload = {
-          name: formData.name,
-          startDate: new Date(formData.startDate).toISOString(),
-          endDate: new Date(formData.endDate).toISOString(),
-        };
-        await createPhase(projectId, phasePayload);
-        onPhasesChanged?.();
-      } else {
-        const startWeek = getISOWeek(new Date(formData.startDate));
-        const endWeek = getISOWeek(new Date(formData.endDate));
-        setPhases((prev) => [
-          ...prev,
-          {
-            name: formData.name,
-            startWeek,
-            duration: Math.max(1, endWeek - startWeek + 1),
-            status: "onTime" as const,
-          },
-        ]);
-      }
+      await createPhase(projectId, {
+        name: formData.name,
+        startDate: new Date(formData.startDate).toISOString(),
+        endDate: new Date(formData.endDate).toISOString(),
+      });
+      onPhasesChanged?.();
       setShowAddModal(false);
       setFormData({ name: "", startDate: "", endDate: "" });
       setFormError(null);
@@ -199,7 +507,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
       await deletePhase(phaseId);
     } catch (err) {
       console.error("Failed to delete phase:", err);
-      onPhasesChanged?.(); // revert by refetching if it failed
+      onPhasesChanged?.();
     }
   };
 
@@ -215,28 +523,40 @@ const GanttChart: React.FC<GanttChartProps> = ({
     });
   };
 
-  const phaseKey = (p: GanttPhase) => p.id?.toString() ?? p.name;
+  const phaseKey = (p: GanttPhase) => p.id.toString();
 
   return (
-    <div className="rounded-xl bg-white shadow text-sm overflow-hidden">
+    <div
+      className="rounded-xl bg-white shadow text-sm overflow-hidden"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* Toolbar */}
       <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b">
         <h2 className="font-semibold text-base">Tidsplan</h2>
-        <div className="flex gap-2">
-          <button
-            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-            onClick={() => setShowResourceModal(true)}
-          >
-            <Users className="w-3.5 h-3.5 text-purple-600" />
-            Allokera resurser
-          </button>
-          <button
-            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus className="w-3.5 h-3.5 text-purple-600" />
-            Lägg till fas
-          </button>
+        <div className="flex items-center gap-3">
+          {yearClampError && (
+            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+              {yearClampError}
+            </span>
+          )}
+          <div className="flex gap-2">
+            <button
+              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+              onClick={() => setShowResourceModal(true)}
+            >
+              <Users className="w-3.5 h-3.5 text-purple-600" />
+              Allokera resurser
+            </button>
+            <button
+              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+              onClick={() => setShowAddModal(true)}
+            >
+              <Plus className="w-3.5 h-3.5 text-purple-600" />
+              Lägg till fas
+            </button>
+          </div>
         </div>
       </div>
 
@@ -280,8 +600,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
           const allocatedCount = (phaseResourceMap[key] ?? []).length;
           return (
             <div
-              key={idx}
-              className="grid relative border-t group"
+              key={phase.id}
+              className="grid relative border-t"
               style={{
                 gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)`,
               }}
@@ -299,23 +619,21 @@ const GanttChart: React.FC<GanttChartProps> = ({
                     {allocatedCount}
                   </span>
                 )}
-                {phase.id && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirmId(phase.id!);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-500 flex-shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteConfirmId(phase.id);
+                  }}
+                  className="text-gray-400 hover:text-red-500 flex-shrink-0 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {weeks.map((w) => (
                 <div
                   key={w}
-                  className={`border-l ${w === currentWeek ? "bg-purple-50" : ""}`}
+                  className={`border-l ${w === currentWeek ? "bg-purple-50" : w % 2 === 0 ? "bg-gray-50/40" : ""}`}
                   style={{ height: `${ROW_HEIGHT}px` }}
                 />
               ))}
@@ -328,7 +646,15 @@ const GanttChart: React.FC<GanttChartProps> = ({
                   {...phase}
                   top={0}
                   weekWidth={WEEK_WIDTH}
-                  onEdit={handleEdit}
+                  onEdit={(p) => {
+                    const full = phases.find((ph) => ph.name === p.name);
+                    if (full) handleEdit(full);
+                  }}
+                  onDragStart={(type, clientX) =>
+                    handleDragStart(idx, type, clientX)
+                  }
+                  isDragging={draggingIdx === idx}
+                  hasDragged={hasDraggedRef}
                   resources={(phaseResourceMap[key] ?? [])
                     .map(
                       (id) => allResources.find((r) => r.id === id)?.name ?? "",
@@ -356,6 +682,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           <div
             className="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
           >
             <div className="h-1 w-full bg-purple-600" />
             <div className="p-6">
@@ -449,6 +776,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           <div
             className="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
           >
             <div className="h-1 w-full bg-purple-600" />
             <div className="p-6">
@@ -551,6 +879,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           <div
             className="bg-white rounded-2xl shadow-2xl w-[32rem] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
           >
             <div className="h-1 w-full bg-purple-600" />
             <div className="p-6">
@@ -570,7 +899,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
               </div>
 
               {!selectedPhaseForResources ? (
-                // Phase selection view
                 <>
                   <p className="text-xs text-gray-500 mb-3">
                     Välj en fas för att tilldela resurser
@@ -612,7 +940,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
                   </div>
                 </>
               ) : (
-                // Resource picker view
                 <>
                   <button
                     onClick={() => setSelectedPhaseForResources(null)}

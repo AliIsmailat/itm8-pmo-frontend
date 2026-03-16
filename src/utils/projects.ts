@@ -1,7 +1,5 @@
+import api from "./axiosInstance";
 import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/Projects";
-const DELETIONS_URL = "http://localhost:5000/api/Deletions";
 
 // ─── Response shapes ─────────────────────────────────────────────────────────
 
@@ -11,10 +9,7 @@ export interface ProjectResource {
   hoursSpent?: number | null;
   totalHoursSpent?: number | null;
   email?: string | null;
-  phoneNumber?: string | null;
   location?: string | null;
-  clLevel?: string | null;
-  skills?: string[];
 }
 
 export interface ProjectContactPerson {
@@ -112,37 +107,33 @@ export interface PhaseUpdateDto {
 // ─── Project API calls ────────────────────────────────────────────────────────
 
 export const getProjects = async (): Promise<Project[]> => {
-  const res = await axios.get<Project[]>(API_URL);
+  const res = await api.get<Project[]>("/Projects");
   return res.data;
 };
 
 export const getOvertimeProjects = async (): Promise<Project[]> => {
-  const res = await axios.get<Project[]>(`${API_URL}/overtime`);
+  const res = await api.get<Project[]>("/Projects/overtime");
   return res.data;
 };
 
 export const getProjectById = async (id: number): Promise<Project> => {
-  const res = await axios.get<Project>(`${API_URL}/${id}`);
+  const res = await api.get<Project>(`/Projects/${id}`);
   return res.data;
 };
 
 export const createProject = async (data: ProjectCreateDto): Promise<Project> => {
-  const res = await axios.post<Project>(API_URL, data);
+  const res = await api.post<Project>("/Projects", data);
   return res.data;
 };
 
 export const updateProject = async (id: number, data: ProjectUpdateDto): Promise<Project> => {
-  const res = await axios.put<Project>(`${API_URL}/${id}`, data);
+  const res = await api.put<Project>(`/Projects/${id}`, data);
   return res.data;
 };
 
 export const deleteProject = async (id: number): Promise<void> => {
   try {
-    await axios.post(
-      `${DELETIONS_URL}/project/${id}`,
-      { gracePeriodMinutes: 1440 },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    await api.post(`/Deletions/project/${id}`, { gracePeriodMinutes: 1440 });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete project error:", message);
@@ -150,32 +141,26 @@ export const deleteProject = async (id: number): Promise<void> => {
   }
 };
 
-const PHASES_URL = "http://localhost:5000/api/Phases";
-
 // ─── Phase API calls ──────────────────────────────────────────────────────────
 
 export const createPhase = async (projectId: number, data: PhaseCreateDto): Promise<Phase> => {
-  const res = await axios.post<Phase>(`${PHASES_URL}/by-project/${projectId}`, data);
+  const res = await api.post<Phase>(`/Phases/by-project/${projectId}`, data);
   return res.data;
 };
 
 export const updatePhase = async (phaseId: number, data: PhaseUpdateDto): Promise<Phase> => {
-  const res = await axios.put<Phase>(`${PHASES_URL}/${phaseId}`, data);
+  const res = await api.put<Phase>(`/Phases/${phaseId}`, data);
   return res.data;
 };
 
 export const getPhaseById = async (phaseId: number): Promise<Phase> => {
-  const res = await axios.get<Phase>(`${PHASES_URL}/${phaseId}`);
+  const res = await api.get<Phase>(`/Phases/${phaseId}`);
   return res.data;
 };
 
 export const deletePhase = async (phaseId: number): Promise<void> => {
   try {
-    await axios.post(
-      `${DELETIONS_URL}/phase/${phaseId}`,
-      { gracePeriodMinutes: 1 },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    await api.post(`/Deletions/phase/${phaseId}`, { gracePeriodMinutes: 1 });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete phase error:", message);

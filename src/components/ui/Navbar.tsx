@@ -1,13 +1,31 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Folder, Users, Handshake, Archive } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Folder, Users, Handshake, Archive, LogOut } from "lucide-react";
+import { jwtDecode } from "jwt-decode";
+import { getToken, clearToken } from "../../utils/auth";
+
+interface JwtPayload {
+  email: string;
+  role: string;
+}
+
+function getUserFromToken(): { username: string; role: string } {
+  const token = getToken();
+  if (!token) return { username: "User", role: "Admin" };
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+    const username = decoded.email.split("@")[0];
+    return { username, role: decoded.role };
+  } catch {
+    return { username: "User", role: "Admin" };
+  }
+}
 
 const Navbar: React.FC = () => {
-  const username = "User";
-  const role = "Admin";
+  const { username, role } = getUserFromToken();
   const initial = username.charAt(0).toUpperCase();
-
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navLinks = [
     { to: "/", label: "Start", icon: Home },
@@ -16,6 +34,11 @@ const Navbar: React.FC = () => {
     { to: "/customers", label: "Kunder", icon: Handshake },
     { to: "/archive", label: "Arkiv", icon: Archive },
   ];
+
+  const handleLogout = () => {
+    clearToken();
+    navigate("/login");
+  };
 
   return (
     <nav
@@ -33,7 +56,6 @@ const Navbar: React.FC = () => {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 274.03 87.8"
             width="90"
-            height="auto"
           >
             <defs>
               <style>{`.cls-1 { fill: #fff; stroke-width: 0px; }`}</style>
@@ -126,6 +148,13 @@ const Navbar: React.FC = () => {
         <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white bg-gray-400">
           {initial}
         </div>
+        <button
+          onClick={handleLogout}
+          className="ml-1 p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition"
+          title="Logga ut"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </nav>
   );

@@ -4,6 +4,8 @@ import type { Project } from "../../utils/projects";
 
 interface Props {
   projects: Project[];
+  filteredCount: number;
+  totalCount: number;
   onSelect?: (p: Project) => void;
   onEdit?: (p: Project) => void;
   onDelete?: (p: Project) => void;
@@ -16,6 +18,8 @@ interface MenuPos {
 
 const TableView: React.FC<Props> = ({
   projects,
+  filteredCount,
+  totalCount,
   onSelect,
   onEdit,
   onDelete,
@@ -54,12 +58,15 @@ const TableView: React.FC<Props> = ({
 
   return (
     <>
+      <p className="text-xs text-gray-400 mb-2 text-right">
+        Visar {filteredCount} av {totalCount} projekt
+      </p>
       <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-200 text-left text-sm text-gray-600">
               <th className="p-4 font-bold">Kund</th>
-              <th className="p-4">Projekt ({projects.length})</th>
+              <th className="p-4">Projekt</th>
               <th className="p-4">Start</th>
               <th className="p-4">Slut</th>
               <th className="p-4">Projektledare</th>
@@ -102,7 +109,6 @@ const TableView: React.FC<Props> = ({
         </table>
       </div>
 
-      {/* Rendered outside the table so it never triggers scroll */}
       {openMenuId !== null && (
         <div
           ref={menuRef}

@@ -1,7 +1,5 @@
+import api from "./axiosInstance";
 import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/Resources";
-const DELETIONS_URL = "http://localhost:5000/api/Deletions";
 
 export interface Resource {
   id: number;
@@ -16,7 +14,7 @@ export interface Resource {
 }
 
 export const getResources = async (): Promise<Resource[]> => {
-  const res = await axios.get<Resource[]>(API_URL);
+  const res = await api.get<Resource[]>("/Resources");
   return res.data;
 };
 
@@ -31,16 +29,12 @@ export const updateResource = async (
     skills: { skillId: number | null; skillName: string }[];
   },
 ): Promise<void> => {
-  await axios.put(`${API_URL}/${id}`, data);
+  await api.put(`/Resources/${id}`, data);
 };
 
 export const deleteResource = async (id: number): Promise<void> => {
   try {
-    await axios.post(
-      `${DELETIONS_URL}/resource/${id}`,
-      { gracePeriodMinutes: 1440 },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    await api.post(`/Deletions/resource/${id}`, { gracePeriodMinutes: 1440 });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete resource error:", message);

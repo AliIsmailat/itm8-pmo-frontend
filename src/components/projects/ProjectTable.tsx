@@ -74,6 +74,8 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         <>
           <TableView
             projects={paginated}
+            filteredCount={filteredProjects.length}
+            totalCount={projects.length}
             onSelect={onSelect}
             onEdit={onEdit}
             onDelete={onDelete}

@@ -1,6 +1,4 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/Deletions";
+import api from "./axiosInstance";
 
 export type DeletionStatus = "Pending" | "Completed" | "Cancelled";
 
@@ -24,11 +22,10 @@ export interface PendingDeletion {
 }
 
 export const getPendingDeletions = async (): Promise<PendingDeletion[]> => {
-  const res = await axios.get<PendingDeletion[]>(`${API_URL}/pending`);
+  const res = await api.get<PendingDeletion[]>("/Deletions/pending");
   return res.data;
 };
 
-
 export const cancelDeletion = async (id: number): Promise<void> => {
-  await axios.post(`${API_URL}/${id}/cancel`);
+  await api.post(`/Deletions/${id}/cancel`);
 };

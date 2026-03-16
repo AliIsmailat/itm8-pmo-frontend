@@ -1,17 +1,38 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import axios from "axios";
+import { saveToken } from "../../utils/auth";
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const error: string | null = null;
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: implement login logic when backend is ready
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await axios.post("http://localhost:5000/api/Auth/login", {
+        email,
+        password,
+      });
+      saveToken(res.data.token, rememberMe);
+      navigate("/");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError("Felaktig e-post eller lösenord.");
+      } else {
+        setError("Något gick fel. Försök igen.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -87,9 +108,10 @@ const LoginForm: React.FC = () => {
 
         <button
           onClick={handleSubmit}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition shadow-sm bg-purple-600"
+          disabled={loading}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition shadow-sm disabled:opacity-60 bg-purple-600"
         >
-          Logga in
+          {loading ? "Loggar in..." : "Logga in"}
         </button>
       </div>
 

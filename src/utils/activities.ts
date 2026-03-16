@@ -1,7 +1,5 @@
+import api from "./axiosInstance";
 import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/Activities";
-const DELETIONS_URL = "http://localhost:5000/api/Deletions";
 
 export type ActivityStatus = "NotStarted" | "InProgress" | "Completed" | "OnHold" | "Cancelled";
 
@@ -44,27 +42,23 @@ export interface ActivityUpdateDto {
 }
 
 export const getActivitiesByProject = async (projectId: number): Promise<Activity[]> => {
-  const res = await axios.get<Activity[]>(`${API_URL}/by-project/${projectId}`);
+  const res = await api.get<Activity[]>(`/Activities/by-project/${projectId}`);
   return res.data;
 };
 
 export const createActivity = async (data: ActivityCreateDto): Promise<Activity> => {
-  const res = await axios.post<Activity>(API_URL, data);
+  const res = await api.post<Activity>("/Activities", data);
   return res.data;
 };
 
 export const updateActivity = async (id: number, data: ActivityUpdateDto): Promise<Activity> => {
-  const res = await axios.put<Activity>(`${API_URL}/${id}`, data);
+  const res = await api.put<Activity>(`/Activities/${id}`, data);
   return res.data;
 };
 
 export const deleteActivity = async (id: number): Promise<void> => {
   try {
-    await axios.post(
-      `${DELETIONS_URL}/activity/${id}`,
-      { gracePeriodMinutes: 1440 },
-      { headers: { "Content-Type": "application/json" } },
-    );
+    await api.post(`/Deletions/activity/${id}`, { gracePeriodMinutes: 1440 });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete activity error response:", message);

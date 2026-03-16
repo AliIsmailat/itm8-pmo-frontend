@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import ProjectInfo from "./ProjectInfo";
 import ProjectEditModal from "./ProjectEditModal";
 import GanttChart from "../ganttchart/GanttChart";
-import ActivityBoard from "./ActivityBoard";
+import ActivityTimeline from "./ActivityTimeline";
 import ActivityActionsContainer from "./ActivityActionsContainer";
 import { getProjectById } from "../../utils/projects";
 import type { Project } from "../../utils/projects";
@@ -14,11 +14,10 @@ import {
   Plus,
   Upload,
   Mail,
-  Phone,
   MapPin,
-  Award,
   X,
   Clock,
+  LayoutList,
 } from "lucide-react";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import axios from "axios";
@@ -26,16 +25,17 @@ import axios from "axios";
 const IMPORT_URL = "http://localhost:5000/api/Activities";
 
 function getISOWeek(date: Date): number {
-  const d = new Date(date.getTime());
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
+  const d = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+  const week1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
   return (
     1 +
     Math.round(
       ((d.getTime() - week1.getTime()) / 86400000 -
         3 +
-        ((week1.getDay() + 6) % 7)) /
+        ((week1.getUTCDay() + 6) % 7)) /
         7,
     )
   );
@@ -92,6 +92,19 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
       .catch(console.error);
   }, [projectId]);
 
+  const anyModalOpen = activityModalOpen || editModalOpen || !!selectedResource;
+
+  useEffect(() => {
+    if (anyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [anyModalOpen]);
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -138,8 +151,10 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
     return {
       id: p.id,
       name: p.name,
+      startDate: p.startDate,
+      endDate: p.endDate,
       startWeek,
-      duration: Math.max(1, endWeek - startWeek + 1),
+      duration: Math.max(1, endWeek - startWeek),
       status: "onTime" as const,
     };
   });
@@ -237,7 +252,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
             {importError}
           </div>
         )}
-        <ActivityBoard
+        <ActivityTimeline
           activities={activities}
           onEdit={(a) => {
             setEditingActivity(a);
@@ -252,11 +267,20 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
 
       <Divider />
 
-      <GanttChart
-        phases={ganttPhases}
-        projectId={projectId}
-        onPhasesChanged={reloadProject}
-      />
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <LayoutList className="w-5 h-5 text-purple-600" />
+          <h2 className="text-base font-semibold text-gray-800">Faser</h2>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+            {project.phases.length}
+          </span>
+        </div>
+        <GanttChart
+          phases={ganttPhases}
+          projectId={projectId}
+          onPhasesChanged={reloadProject}
+        />
+      </section>
 
       <ActivityActionsContainer
         isOpen={activityModalOpen}
@@ -322,40 +346,12 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
                   <span>{selectedResource.email}</span>
                 </div>
               )}
-              {selectedResource.phoneNumber && (
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Phone className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span>{selectedResource.phoneNumber}</span>
-                </div>
-              )}
               {selectedResource.location && (
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <MapPin className="w-4 h-4 text-purple-400 shrink-0" />
                   <span>{selectedResource.location}</span>
                 </div>
               )}
-              {selectedResource.clLevel && (
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Award className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span>{selectedResource.clLevel}</span>
-                </div>
-              )}
-              {selectedResource.skills &&
-                selectedResource.skills.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-gray-400">Kompetenser</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedResource.skills.map((s) => (
-                        <span
-                          key={s}
-                          className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-full"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               <div className="h-px bg-gray-100" />
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Clock className="w-4 h-4 text-purple-400 shrink-0" />
