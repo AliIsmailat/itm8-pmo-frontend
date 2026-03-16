@@ -26,19 +26,22 @@ stages:
           - script: node --version && npm --version
             displayName: 'Verify Node and npm versions'
 
+          - script: ls -la $(System.DefaultWorkingDirectory)
+            displayName: 'List repo root contents'
+
           - script: npm ci
             displayName: 'Install dependencies'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/PMO.Tool'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
 
           - script: npm run build
             displayName: 'Build Vite app'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/PMO.Tool'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
             env:
               VITE_API_URL: $(VITE_API_URL)
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: '$(System.DefaultWorkingDirectory)/PMO.Tool/dist'
+              PathtoPublish: '$(System.DefaultWorkingDirectory)/dist'
               ArtifactName: 'dist'
             displayName: 'Publish build artifact'
 
