@@ -22,7 +22,8 @@ import {
 import LoadingSpinner from "../ui/LoadingSpinner";
 import axios from "axios";
 
-const IMPORT_URL = "http://localhost:5000/api/Activities";
+const IMPORT_URL =
+  "https://itm8-pmo-system-api-dtb5fxa6cxbmagez.swedencentral-01.azurewebsites.net/api/Activities";
 
 function getISOWeek(date: Date): number {
   const d = new Date(

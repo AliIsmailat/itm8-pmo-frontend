@@ -2,7 +2,7 @@ import axios from "axios";
 import { getToken, clearToken } from "./auth";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://itm8-pmo-system-api-dtb5fxa6cxbmagez.swedencentral-01.azurewebsites.net/api",
 });
 
 api.interceptors.request.use((config) => {
