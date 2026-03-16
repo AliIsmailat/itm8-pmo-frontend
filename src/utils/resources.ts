@@ -1,32 +1,43 @@
+import api from "./axiosInstance";
 import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/Resources";
-
-export interface Skill {
-  id: number;
-  name: string;
-}
 
 export interface Resource {
   id: number;
   name: string;
   location: string;
+  phoneNumber: string;
+  email: string;
   clLevel: string;
-  skills: Skill[];
-  projects: unknown[];
+  projectCount?: number;
+  skills?: { id: number; name: string }[];
+  projects?: { id: number; name: string }[];
 }
 
 export const getResources = async (): Promise<Resource[]> => {
-  const res = await axios.get<Resource[]>(API_URL);
+  const res = await api.get<Resource[]>("/Resources");
   return res.data;
 };
 
-export const createResource = async (data: {
-  name: string;
-  location: string;
-  clLevel: string;
-  skills: Skill[];
-}): Promise<Resource> => {
-  const res = await axios.post<Resource>(API_URL, data);
-  return res.data;
+export const updateResource = async (
+  id: number,
+  data: {
+    name: string;
+    location: string;
+    phoneNumber: string;
+    email: string;
+    clLevel: string;
+    skills: { skillId: number | null; skillName: string }[];
+  },
+): Promise<void> => {
+  await api.put(`/Resources/${id}`, data);
+};
+
+export const deleteResource = async (id: number): Promise<void> => {
+  try {
+    await api.post(`/Deletions/resource/${id}`, { gracePeriodMinutes: 1440 });
+  } catch (err: unknown) {
+    const message = axios.isAxiosError(err) ? err.response?.data : err;
+    console.error("Delete resource error:", message);
+    throw err;
+  }
 };

@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --brand: #33165a;
+  --brand-hover: #2a1149;
+  --brand-light: #f3eefa;
+}
+
+body {
+  background-color: #f7f5fb;
+}
