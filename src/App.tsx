@@ -8,7 +8,6 @@ import Resources from "./pages/Resources";
 import Customers from "./pages/Customers";
 import Archive from "./pages/Archive";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import { isAuthenticated } from "./utils/auth";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
@@ -23,14 +22,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
 
 const App: React.FC = () => {
   const location = useLocation();
-  const isAuthPage =
-    location.pathname === "/login" || location.pathname === "/register";
+  const isAuthPage = location.pathname === "/login";
 
   if (isAuthPage) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
       </Routes>
     );
   }
