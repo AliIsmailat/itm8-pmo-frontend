@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import MainLayout from "./layout/MainLayout";
+import MsalAuthGuard from "./components/auth/MsalAuthGuard";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
@@ -10,7 +11,8 @@ import Archive from "./pages/Archive";
 import Login from "./pages/Login";
 import { isAuthenticated } from "./utils/auth";
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+/** Guards routes that require app-level login (JWT from /api/Auth/login). */
+const AppProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const location = useLocation();
@@ -22,70 +24,70 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
 
 const App: React.FC = () => {
   const location = useLocation();
-  const isAuthPage = location.pathname === "/login";
-
-  if (isAuthPage) {
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-      </Routes>
-    );
-  }
+  const isLoginPage = location.pathname === "/login";
 
   return (
-    <MainLayout>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <Projects />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects/:id"
-          element={
-            <ProtectedRoute>
-              <ProjectDetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/resources"
-          element={
-            <ProtectedRoute>
-              <Resources />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/customers"
-          element={
-            <ProtectedRoute>
-              <Customers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/archive"
-          element={
-            <ProtectedRoute>
-              <Archive />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </MainLayout>
+    <MsalAuthGuard>
+      {isLoginPage ? (
+        <Routes>
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      ) : (
+        <MainLayout>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <AppProtectedRoute>
+                  <Dashboard />
+                </AppProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects"
+              element={
+                <AppProtectedRoute>
+                  <Projects />
+                </AppProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:id"
+              element={
+                <AppProtectedRoute>
+                  <ProjectDetails />
+                </AppProtectedRoute>
+              }
+            />
+            <Route
+              path="/resources"
+              element={
+                <AppProtectedRoute>
+                  <Resources />
+                </AppProtectedRoute>
+              }
+            />
+            <Route
+              path="/customers"
+              element={
+                <AppProtectedRoute>
+                  <Customers />
+                </AppProtectedRoute>
+              }
+            />
+            <Route
+              path="/archive"
+              element={
+                <AppProtectedRoute>
+                  <Archive />
+                </AppProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </MainLayout>
+      )}
+    </MsalAuthGuard>
   );
 };
 

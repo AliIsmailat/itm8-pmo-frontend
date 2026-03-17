@@ -1,27 +1,50 @@
 import axios from "axios";
-import { getToken, clearToken } from "./auth";
+import { getToken } from "./auth";
+import { msalInstance, loginRequest } from "./msalConfig";
 
-const api = axios.create({
-  baseURL: "https://itm8-pmo-system-api-dtb5fxa6cxbmagez.swedencentral-01.azurewebsites.net/api",
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+axiosInstance.interceptors.request.use(
+  async (config) => {
+    // Acquire Entra ID id_token silently to pass EasyAuth gate.
+    // EasyAuth accepts id_tokens when aud matches the registered client ID.
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const response = await msalInstance.acquireTokenSilent({
+          ...loginRequest,
+          account: accounts[0],
+        });
+        if (response.idToken) {
+          config.headers.Authorization = `Bearer ${response.idToken}`;
+        }
+      } catch {
+        // Silent acquisition failed — MsalAuthGuard will handle re-auth
+      }
+    }
 
-api.interceptors.response.use(
+    // App-level JWT for controller [Authorize] attributes.
+    // Sent as separate header so it doesn't overwrite the Entra ID token.
+    const appToken = getToken();
+    if (appToken) {
+      config.headers["X-App-Token"] = appToken;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      clearToken();
-      window.location.href = "/login";
+      console.warn("401 Unauthorized — check Entra ID or app JWT.");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
-export default api;
+export default axiosInstance;
