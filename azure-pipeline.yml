@@ -38,6 +38,8 @@ stages:
             workingDirectory: '$(System.DefaultWorkingDirectory)'
             env:
               VITE_API_URL: $(VITE_API_URL)
+              VITE_MSAL_CLIENT_ID: $(VITE_MSAL_CLIENT_ID)
+              VITE_MSAL_TENANT_ID: $(VITE_MSAL_TENANT_ID)
 
           - task: PublishBuildArtifacts@1
             inputs:
