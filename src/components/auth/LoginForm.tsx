@@ -20,17 +20,13 @@ const LoginForm: React.FC = () => {
     try {
       // axiosInstance attaches the Entra ID token automatically to bypass EasyAuth
       const res = await axiosInstance.post("/Auth/login", {
-        email,
-        password,
+        email: email.trim(),
+        password: password.trim(),
       });
       saveToken(res.data.token, rememberMe);
       navigate("/");
     } catch (err: unknown) {
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err
-      ) {
+      if (typeof err === "object" && err !== null && "response" in err) {
         const axiosErr = err as { response?: { status?: number } };
         if (axiosErr.response?.status === 401) {
           setError("Felaktig e-post eller lösenord.");
