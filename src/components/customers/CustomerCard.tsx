@@ -45,7 +45,7 @@ const CustomerCard: React.FC<Props> = ({
 
   return (
     <div
-      className="relative w-[22rem] cursor-pointer group"
+      className="relative w-full sm:w-[22rem] cursor-pointer group"
       onClick={() => navigate(`/projects?customerId=${id}`)}
       style={{ fontFamily: "'Inter', sans-serif" }}
     >

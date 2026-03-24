@@ -43,9 +43,9 @@ export const updateClient = async (
   await api.put(`/Clients/${id}`, data);
 };
 
-export const deleteClient = async (id: number): Promise<void> => {
+export const deleteClient = async (id: number, gracePeriodMinutes = 1440): Promise<void> => {
   try {
-    await api.post(`/Deletions/client/${id}`, { gracePeriodMinutes: 1440 });
+    await api.post(`/Deletions/client/${id}`, { gracePeriodMinutes });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete client error:", message);

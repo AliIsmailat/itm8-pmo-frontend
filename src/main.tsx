@@ -8,17 +8,20 @@ import App from "./App";
 import "./index.css";
 
 msalInstance.initialize().then(() => {
-  msalInstance.handleRedirectPromise().then(() => {
-    ReactDOM.createRoot(document.getElementById("root")!).render(
-      <React.StrictMode>
-        <MsalProvider instance={msalInstance}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </MsalProvider>
-      </React.StrictMode>,
-    );
-  }).catch((error) => {
-    console.error("MSAL redirect error:", error);
-  });
+  msalInstance
+    .handleRedirectPromise()
+    .then(() => {
+      ReactDOM.createRoot(document.getElementById("root")!).render(
+        <React.StrictMode>
+          <MsalProvider instance={msalInstance}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </MsalProvider>
+        </React.StrictMode>,
+      );
+    })
+    .catch((error) => {
+      console.error("MSAL redirect error:", error);
+    });
 });

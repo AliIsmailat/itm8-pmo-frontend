@@ -131,9 +131,9 @@ export const updateProject = async (id: number, data: ProjectUpdateDto): Promise
   return res.data;
 };
 
-export const deleteProject = async (id: number): Promise<void> => {
+export const deleteProject = async (id: number, gracePeriodMinutes = 1440): Promise<void> => {
   try {
-    await api.post(`/Deletions/project/${id}`, { gracePeriodMinutes: 1440 });
+    await api.post(`/Deletions/project/${id}`, { gracePeriodMinutes });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete project error:", message);

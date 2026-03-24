@@ -8,6 +8,21 @@ interface Props {
   width?: string;
 }
 
+function toCSS(w: string): string {
+  const bracket = w.match(/w-\[(.+)\]/);
+  if (bracket) return bracket[1];
+  const fixed: Record<string, string> = {
+    "w-80": "20rem",
+    "w-96": "24rem",
+    "w-[26rem]": "26rem",
+    "w-[32rem]": "32rem",
+    "w-[36rem]": "36rem",
+    "w-[38rem]": "38rem",
+    "w-[40rem]": "40rem",
+  };
+  return fixed[w] ?? "26rem";
+}
+
 const Modal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -42,7 +57,7 @@ const Modal: React.FC<Props> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{
         backgroundColor: "rgba(0,0,0,0.35)",
         backdropFilter: "blur(4px)",
@@ -51,30 +66,29 @@ const Modal: React.FC<Props> = ({
       }}
     >
       <style>{`
-        @keyframes modalBgIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
+        @keyframes modalBgIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes modalSlideIn {
-          from { opacity: 0; transform: translateY(12px) scale(0.98); }
+          from { opacity: 0; transform: translateY(16px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
       <div
         ref={modalRef}
-        className={`bg-white rounded-2xl shadow-2xl relative overflow-hidden ${width}`}
-        style={{ animation: "modalSlideIn 0.2s ease-out" }}
+        className="bg-white shadow-2xl relative overflow-hidden rounded-t-2xl sm:rounded-2xl"
+        style={{
+          animation: "modalSlideIn 0.2s ease-out",
+          width: "100%",
+          maxWidth: `min(${toCSS(width)}, calc(100vw - 2rem))`,
+        }}
       >
         <div className="h-1 w-full bg-purple-600" />
-
         <button
           onClick={onClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
-
-        <div className="p-7">{children}</div>
+        <div className="p-5 sm:p-7">{children}</div>
       </div>
     </div>
   );

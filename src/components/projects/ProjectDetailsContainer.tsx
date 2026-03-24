@@ -3,6 +3,7 @@ import ProjectInfo from "./ProjectInfo";
 import ProjectEditModal from "./ProjectEditModal";
 import GanttChart from "../ganttchart/GanttChart";
 import ActivityTimeline from "./ActivityTimeline";
+import ActivityBoard from "./ActivityBoard";
 import ActivityActionsContainer from "./ActivityActionsContainer";
 import { getProjectById } from "../../utils/projects";
 import type { Project } from "../../utils/projects";
@@ -18,6 +19,8 @@ import {
   X,
   Clock,
   LayoutList,
+  GanttChartSquare,
+  Kanban,
 } from "lucide-react";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import axios from "axios";
@@ -71,6 +74,9 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
   const [selectedResource, setSelectedResource] = useState<
     Project["resources"][0] | null
   >(null);
+  const [activityView, setActivityView] = useState<"timeline" | "board">(
+    "timeline",
+  );
 
   useEffect(() => {
     if (!projectId) return;
@@ -210,7 +216,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
       <Divider />
 
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-purple-600" />
             <h2 className="text-base font-semibold text-gray-800">
@@ -220,7 +226,31 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
               {activities.length}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-1 gap-1">
+              <button
+                onClick={() => setActivityView("timeline")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                  activityView === "timeline"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <GanttChartSquare className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tidslinje</span>
+              </button>
+              <button
+                onClick={() => setActivityView("board")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                  activityView === "board"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <Kanban className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -234,7 +264,9 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
               className="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium px-3 py-2 rounded-lg border border-gray-200 transition shadow-sm disabled:opacity-50"
             >
               <Upload className="w-3.5 h-3.5" />
-              {importing ? "Importerar..." : "Importera .xls"}
+              <span className="hidden sm:inline">
+                {importing ? "Importerar..." : "Importera .xls"}
+              </span>
             </button>
             <button
               onClick={() => {
@@ -244,7 +276,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
               className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
-              Lägg till aktivitet
+              <span className="hidden sm:inline">Lägg till aktivitet</span>
             </button>
           </div>
         </div>
@@ -253,17 +285,31 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
             {importError}
           </div>
         )}
-        <ActivityTimeline
-          activities={activities}
-          onEdit={(a) => {
-            setEditingActivity(a);
-            setActivityModalOpen(true);
-          }}
-          onDelete={(id) =>
-            setActivities((prev) => prev.filter((a) => a.id !== id))
-          }
-          onRefresh={reloadActivities}
-        />
+        {activityView === "timeline" ? (
+          <ActivityTimeline
+            activities={activities}
+            onEdit={(a) => {
+              setEditingActivity(a);
+              setActivityModalOpen(true);
+            }}
+            onDelete={(id) =>
+              setActivities((prev) => prev.filter((a) => a.id !== id))
+            }
+            onRefresh={reloadActivities}
+          />
+        ) : (
+          <ActivityBoard
+            activities={activities}
+            onEdit={(a) => {
+              setEditingActivity(a);
+              setActivityModalOpen(true);
+            }}
+            onDelete={(id) =>
+              setActivities((prev) => prev.filter((a) => a.id !== id))
+            }
+            onRefresh={reloadActivities}
+          />
+        )}
       </section>
 
       <Divider />

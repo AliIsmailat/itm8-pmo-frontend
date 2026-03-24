@@ -44,6 +44,7 @@ const CustomerListContainer: React.FC<Props> = ({
         phoneNumber: c.phoneNumber,
         email: c.email,
         ongoingProjects: c.projectCount ?? 0,
+        projects: c.projects ?? [],
       }));
       setCustomers(normalized);
     } catch (err) {
@@ -57,12 +58,12 @@ const CustomerListContainer: React.FC<Props> = ({
     fetchClients();
   }, [fetchClients, refetchTrigger]);
 
-  const handleDelete = async () => {
+  const handleDelete = async (gracePeriodMinutes?: number) => {
     if (!deletingCustomer) return;
     setCustomers((prev) => prev.filter((c) => c.id !== deletingCustomer.id));
     setDeletingCustomer(null);
     try {
-      await deleteClient(deletingCustomer.id);
+      await deleteClient(deletingCustomer.id, gracePeriodMinutes);
     } catch (err) {
       console.error("Failed to delete client:", err);
       fetchClients();
@@ -123,6 +124,17 @@ const CustomerListContainer: React.FC<Props> = ({
       <DeleteConfirmModal
         isOpen={!!deletingCustomer}
         entityName={deletingCustomer?.name}
+        entityType="Client"
+        cascadeItems={
+          deletingCustomer?.projects && deletingCustomer.projects.length > 0
+            ? [
+                {
+                  label: "Projekt som kunden är involverad i:",
+                  names: deletingCustomer.projects.map((p) => p.name),
+                },
+              ]
+            : undefined
+        }
         onConfirm={handleDelete}
         onCancel={() => setDeletingCustomer(null)}
       />

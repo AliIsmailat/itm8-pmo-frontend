@@ -26,25 +26,37 @@ const ProjectActions: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col gap-3 mb-6">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Sök projekt, kund eller resurs..."
-          className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition"
-        />
+      {/* Search + Add button */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Sök projekt, kund eller resurs..."
+            className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition"
+          />
+        </div>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-sm transition whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Lägg till projekt</span>
+          <span className="sm:hidden">Nytt</span>
+        </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Filters + ViewSwitch */}
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="date"
           value={filters.startDate || ""}
           onChange={(e) =>
             onFilterChange({ ...filters, startDate: e.target.value })
           }
-          className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm transition"
+          className="flex-1 min-w-0 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm transition"
         />
         <span className="text-gray-300 text-sm">–</span>
         <input
@@ -53,9 +65,8 @@ const ProjectActions: React.FC<Props> = ({
           onChange={(e) =>
             onFilterChange({ ...filters, endDate: e.target.value })
           }
-          className="px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm transition"
+          className="flex-1 min-w-0 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm transition"
         />
-
         {hasFilters && (
           <button
             onClick={() => {
@@ -65,19 +76,11 @@ const ProjectActions: React.FC<Props> = ({
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition"
           >
             <X className="w-3.5 h-3.5" />
-            Rensa
+            <span className="hidden sm:inline">Rensa</span>
           </button>
         )}
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto">
           <ViewSwitch view={view} onChange={onViewChange} />
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            Lägg till projekt
-          </button>
         </div>
       </div>
     </div>

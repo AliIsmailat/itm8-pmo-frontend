@@ -10,6 +10,7 @@ export interface ResourceItem {
   clLevel: string;
   skills: { id: number; name: string }[];
   ongoingProjects: number;
+  projects?: { id: number; name: string }[];
 }
 
 interface Props {
@@ -20,7 +21,7 @@ interface Props {
 
 const ResourceList: React.FC<Props> = ({ resources, onEdit, onDelete }) => {
   return (
-    <div className="flex flex-wrap justify-center gap-10">
+    <div className="flex flex-wrap justify-center gap-6">
       {resources.map((r) => (
         <ResourceCard
           key={r.id}

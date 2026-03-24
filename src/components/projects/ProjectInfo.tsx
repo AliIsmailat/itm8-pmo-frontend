@@ -20,7 +20,7 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
 
 const ProjectInfo: React.FC<Props> = ({ project, onEdit }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 sm:p-6">
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-sm font-semibold text-gray-700">
           Projektinformation
@@ -33,8 +33,8 @@ const ProjectInfo: React.FC<Props> = ({ project, onEdit }) => {
           Redigera
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-x-10 gap-y-5">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5">
+        <div className="sm:col-span-2">
           <Field label="Projektnamn" value={project.name} />
         </div>
         <Field label="Kund" value={project.client?.name} />

@@ -27,7 +27,7 @@ const ArchiveCard: React.FC<Props> = ({
     d.entityName ?? `${ENTITY_LABEL[d.entityType]} #${d.entityId}`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex items-center justify-between gap-4">
+    <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-800">
@@ -54,7 +54,7 @@ const ArchiveCard: React.FC<Props> = ({
       <button
         disabled={restoringId === d.id || expired}
         onClick={() => onRestore(d)}
-        className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed border-gray-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 text-gray-600"
+        className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed border-gray-200 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700 text-gray-600"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         {restoringId === d.id ? "Återställer..." : "Återställ"}
