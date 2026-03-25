@@ -32,9 +32,9 @@ export const updateResource = async (
   await api.put(`/Resources/${id}`, data);
 };
 
-export const deleteResource = async (id: number): Promise<void> => {
+export const deleteResource = async (id: number, gracePeriodMinutes = 1440): Promise<void> => {
   try {
-    await api.post(`/Deletions/resource/${id}`, { gracePeriodMinutes: 1440 });
+    await api.post(`/Deletions/resource/${id}`, { gracePeriodMinutes });
   } catch (err: unknown) {
     const message = axios.isAxiosError(err) ? err.response?.data : err;
     console.error("Delete resource error:", message);

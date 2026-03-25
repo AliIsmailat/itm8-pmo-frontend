@@ -53,10 +53,8 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
     .toUpperCase();
 
   return (
-    <div
-      className="relative w-[22rem]"
-      style={{ fontFamily: "'Inter', sans-serif" }}
-    >
+    <div className="w-full sm:w-[22rem]">
+      {" "}
       <div className="bg-gray-100 rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-100">
         <div className="flex items-center gap-4 px-5 pt-5 pb-4">
           <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-base shrink-0 shadow-sm">
@@ -117,7 +115,6 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
               {location || "—"}
             </span>
           </div>
-
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0">
               <Mail className="w-3.5 h-3.5 text-gray-500" />
@@ -126,7 +123,6 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
               {email || "—"}
             </span>
           </div>
-
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0">
               <Phone className="w-3.5 h-3.5 text-gray-500" />
@@ -138,7 +134,6 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Kompetenser
           </div>
-
           <div className="flex items-start gap-3">
             <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0 mt-0.5">
               <Layers className="w-3.5 h-3.5 text-gray-500" />

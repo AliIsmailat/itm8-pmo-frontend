@@ -45,12 +45,12 @@ const Projects: React.FC = () => {
     fetchProjects();
   }, [fetchProjects]);
 
-  const handleDelete = async () => {
+  const handleDelete = async (gracePeriodMinutes?: number) => {
     if (!deletingProject) return;
     setProjects((prev) => prev.filter((p) => p.id !== deletingProject.id));
     setDeletingProject(null);
     try {
-      await deleteProject(deletingProject.id);
+      await deleteProject(deletingProject.id, gracePeriodMinutes);
     } catch (err) {
       console.error("Failed to delete project:", err);
       fetchProjects();
@@ -60,7 +60,7 @@ const Projects: React.FC = () => {
   const clientName = clientIdParam ? projects[0]?.client?.name : null;
 
   return (
-    <div className="p-8 flex flex-col gap-8">
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 overflow-x-hidden">
       <PageHeader
         title="Projekt"
         description={
@@ -115,6 +115,7 @@ const Projects: React.FC = () => {
       <DeleteConfirmModal
         isOpen={!!deletingProject}
         entityName={deletingProject?.name}
+        entityType="Project"
         onConfirm={handleDelete}
         onCancel={() => setDeletingProject(null)}
       />

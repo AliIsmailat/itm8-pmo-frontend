@@ -73,7 +73,7 @@ const GridView: React.FC<Props> = ({ projects }) => {
         {weeks.map((w) => (
           <div
             key={w}
-            className={`text-center border-l py-1 text-[10px] ${
+            className={`text-center border-l py-1 text-[13px] ${
               w === currentWeek ? "bg-purple-200 font-bold" : ""
             }`}
           >

@@ -8,6 +8,7 @@ export interface Customer {
   phoneNumber: string;
   email: string;
   ongoingProjects: number;
+  projects?: { id: number; name: string }[];
 }
 
 interface Props {

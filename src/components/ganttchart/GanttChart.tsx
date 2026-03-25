@@ -533,30 +533,28 @@ const GanttChart: React.FC<GanttChartProps> = ({
       onMouseLeave={handleMouseUp}
     >
       {/* Toolbar */}
-      <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b">
+      <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b flex-wrap gap-2">
         <h2 className="font-semibold text-base">Tidsplan</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {yearClampError && (
             <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
               {yearClampError}
             </span>
           )}
-          <div className="flex gap-2">
-            <button
-              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-              onClick={() => setShowResourceModal(true)}
-            >
-              <Users className="w-3.5 h-3.5 text-purple-600" />
-              Allokera resurser
-            </button>
-            <button
-              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-              onClick={() => setShowAddModal(true)}
-            >
-              <Plus className="w-3.5 h-3.5 text-purple-600" />
-              Lägg till fas
-            </button>
-          </div>
+          <button
+            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+            onClick={() => setShowResourceModal(true)}
+          >
+            <Users className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden sm:inline">Allokera resurser</span>
+          </button>
+          <button
+            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden sm:inline">Lägg till fas</span>
+          </button>
         </div>
       </div>
 
@@ -680,7 +678,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           onClick={() => setSelectedPhase(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
@@ -774,7 +772,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-96 overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
@@ -877,7 +875,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-[32rem] overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 sm:mx-0 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >

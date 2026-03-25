@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import ResourceList from "./ResourceList";
 import type { ResourceItem } from "./ResourceList";
 import { getResources, deleteResource } from "../../utils/resources";
+import { getProjects } from "../../utils/projects";
 import DeleteConfirmModal from "../ui/DeleteConfirmModal";
 import type { ResourceFilterState } from "./ResourceActions";
 import LoadingSpinner from "../ui/LoadingSpinner";
@@ -31,6 +32,23 @@ const ResourceListContainer: React.FC<Props> = ({
   const [deletingResource, setDeletingResource] = useState<ResourceItem | null>(
     null,
   );
+  const [deletingResourceProjects, setDeletingResourceProjects] = useState<
+    string[]
+  >([]);
+
+  const handleDeleteClick = async (r: ResourceItem) => {
+    setDeletingResource(r);
+    try {
+      const allProjects = await getProjects();
+      const resourceProjectIds = new Set((r.projects ?? []).map((p) => p.id));
+      const names = allProjects
+        .filter((p) => resourceProjectIds.has(p.id))
+        .map((p) => p.name);
+      setDeletingResourceProjects(names);
+    } catch {
+      setDeletingResourceProjects([]);
+    }
+  };
 
   const fetchResources = useCallback(async () => {
     setLoading(true);
@@ -45,6 +63,7 @@ const ResourceListContainer: React.FC<Props> = ({
         clLevel: r.clLevel,
         skills: r.skills ?? [],
         ongoingProjects: r.projectCount ?? 0,
+        projects: r.projects ?? [],
       }));
       setResources(normalized);
     } catch (err) {
@@ -58,12 +77,12 @@ const ResourceListContainer: React.FC<Props> = ({
     fetchResources();
   }, [fetchResources, refetchTrigger]);
 
-  const handleDelete = async () => {
+  const handleDelete = async (gracePeriodMinutes?: number) => {
     if (!deletingResource) return;
     setResources((prev) => prev.filter((r) => r.id !== deletingResource.id));
     setDeletingResource(null);
     try {
-      await deleteResource(deletingResource.id);
+      await deleteResource(deletingResource.id, gracePeriodMinutes);
     } catch (err) {
       console.error("Failed to delete resource:", err);
       fetchResources();
@@ -110,7 +129,7 @@ const ResourceListContainer: React.FC<Props> = ({
           <ResourceList
             resources={paginated}
             onEdit={onEdit}
-            onDelete={(r) => setDeletingResource(r)}
+            onDelete={(r) => handleDeleteClick(r)}
           />
           <Pagination
             currentPage={currentPage}
@@ -122,8 +141,22 @@ const ResourceListContainer: React.FC<Props> = ({
       <DeleteConfirmModal
         isOpen={!!deletingResource}
         entityName={deletingResource?.name}
+        entityType="Resource"
+        cascadeItems={
+          deletingResourceProjects.length > 0
+            ? [
+                {
+                  label: "Projekt som resursen är involverad i",
+                  names: deletingResourceProjects,
+                },
+              ]
+            : undefined
+        }
         onConfirm={handleDelete}
-        onCancel={() => setDeletingResource(null)}
+        onCancel={() => {
+          setDeletingResource(null);
+          setDeletingResourceProjects([]);
+        }}
       />
     </>
   );

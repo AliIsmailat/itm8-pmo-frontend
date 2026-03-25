@@ -12,6 +12,10 @@ node_modules
 dist
 dist-ssr
 *.local
+src/_local/
+src/anteckningar.txt
+src/pages/temp.txt
+src/mockdata/
 
 # Editor directories and files
 .vscode/*
