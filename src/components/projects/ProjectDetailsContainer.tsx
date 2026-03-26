@@ -204,6 +204,12 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
                           ? `${r.totalHoursSpent}h totalt`
                           : "Inga timmar loggade"}
                   </span>
+                  {r.location && (
+                    <span className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3 shrink-0" />
+                      {r.location}
+                    </span>
+                  )}
                 </div>
               </button>
             ))}

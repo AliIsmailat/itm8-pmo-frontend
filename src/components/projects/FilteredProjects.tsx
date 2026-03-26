@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import ProjectTable from "./ProjectTable";
 import PageHeader from "../ui/PageHeader";
 import type { Project } from "./ProjectTable";
@@ -14,6 +14,8 @@ const FilteredProjects: React.FC<Props> = ({
   customerName,
   onSelectProject,
 }) => {
+  const [view, setView] = useState<"table" | "grid">("table");
+
   return (
     <div className="p-8 flex flex-col gap-8">
       <PageHeader
@@ -25,7 +27,12 @@ const FilteredProjects: React.FC<Props> = ({
         }
       />
 
-      <ProjectTable projects={projects} onSelect={onSelectProject} />
+      <ProjectTable
+        projects={projects}
+        onSelect={onSelectProject}
+        view={view}
+        onViewChange={setView}
+      />
     </div>
   );
 };
