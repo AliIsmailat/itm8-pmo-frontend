@@ -21,25 +21,29 @@ const Projects: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [view, setView] = useState<"table" | "grid">("table");
 
-  const fetchProjects = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getProjects();
-      let filtered = data;
-      if (clientIdParam)
-        filtered = filtered.filter(
-          (p) => p.client?.id === Number(clientIdParam),
-        );
-      if (overtimeParam === "true")
-        filtered = filtered.filter((p) => p.allocatedHours > p.totalHours);
-      setProjects(filtered);
-    } catch (err) {
-      console.error("Failed to fetch projects:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [clientIdParam, overtimeParam]);
+  const fetchProjects = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const data = await getProjects();
+        let filtered = data;
+        if (clientIdParam)
+          filtered = filtered.filter(
+            (p) => p.client?.id === Number(clientIdParam),
+          );
+        if (overtimeParam === "true")
+          filtered = filtered.filter((p) => p.allocatedHours > p.totalHours);
+        setProjects(filtered);
+      } catch (err) {
+        console.error("Failed to fetch projects:", err);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [clientIdParam, overtimeParam],
+  );
 
   useEffect(() => {
     fetchProjects();
@@ -90,6 +94,9 @@ const Projects: React.FC = () => {
           onSelect={(p) => navigate(`/projects/${p.id}`)}
           onEdit={(p) => setEditingProject(p)}
           onDelete={(p) => setDeletingProject(p)}
+          onSaved={() => fetchProjects(true)}
+          view={view}
+          onViewChange={setView}
         />
       )}
 

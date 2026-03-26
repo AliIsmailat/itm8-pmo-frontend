@@ -71,10 +71,16 @@ const Modal: React.FC<Props> = ({
           from { opacity: 0; transform: translateY(16px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @media (max-width: 639px) {
+          .modal-inner {
+            max-height: 75vh;
+            overflow-y: auto;
+          }
+        }
       `}</style>
       <div
         ref={modalRef}
-        className="bg-white shadow-2xl relative overflow-hidden rounded-t-2xl sm:rounded-2xl"
+        className="modal-inner bg-white shadow-2xl relative overflow-hidden rounded-t-2xl rounded-b-2xl sm:rounded-2xl"
         style={{
           animation: "modalSlideIn 0.2s ease-out",
           width: "100%",

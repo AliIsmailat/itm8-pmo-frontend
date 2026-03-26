@@ -19,6 +19,9 @@ interface ProjectTableProps {
   onEdit?: (project: Project) => void;
   onDelete?: (project: Project) => void;
   onAdd?: () => void;
+  onSaved?: () => void;
+  view: "table" | "grid";
+  onViewChange: (v: "table" | "grid") => void;
 }
 
 const ProjectTable: React.FC<ProjectTableProps> = ({
@@ -27,10 +30,12 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
   onEdit,
   onDelete,
   onAdd,
+  onSaved,
+  view,
+  onViewChange,
 }) => {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<ProjectFilterState>({});
-  const [view, setView] = useState<"table" | "grid">("table");
 
   const filteredProjects = filterProjects(projects, query, filters);
   const { currentPage, totalPages, paginated, setCurrentPage } = usePagination(
@@ -52,7 +57,7 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
           setCurrentPage(1);
         }}
         view={view}
-        onViewChange={setView}
+        onViewChange={onViewChange}
         onAdd={onAdd}
       />
 
@@ -88,7 +93,7 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         </>
       ) : (
         <>
-          <GridView projects={paginated} />
+          <GridView projects={paginated} onSaved={onSaved} />
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
