@@ -8,7 +8,8 @@ const ProjectDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8">
+    <div className="pt-4 sm:pt-6 lg:pt-8 px-4 sm:px-6 lg:px-8 pb-24 flex flex-col gap-6 lg:gap-8">
+      {" "}
       <PageHeader
         title="Projektdetaljer"
         description="Detaljer och tilldelning av projekt"

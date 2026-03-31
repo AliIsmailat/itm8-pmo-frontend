@@ -156,7 +156,7 @@ const ActivityActionsContainer: React.FC<Props> = ({
       </div>
 
       <form
-        className="flex flex-col gap-4 max-h-[78vh] overflow-y-auto px-1 pt-1 pb-2"
+        className="flex flex-col gap-4 px-1 pt-1 pb-2"
         onSubmit={handleSubmit}
       >
         <div className="relative">

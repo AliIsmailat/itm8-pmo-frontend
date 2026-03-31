@@ -104,12 +104,17 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
   useEffect(() => {
     if (anyModalOpen) {
       document.body.style.overflow = "hidden";
+      const prevent = (e: Event) => e.preventDefault();
+      document.addEventListener("wheel", prevent, { passive: false });
+      document.addEventListener("touchmove", prevent, { passive: false });
+      return () => {
+        document.body.style.overflow = "";
+        document.removeEventListener("wheel", prevent);
+        document.removeEventListener("touchmove", prevent);
+      };
     } else {
       document.body.style.overflow = "";
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [anyModalOpen]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,12 +186,12 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
           </span>
         </div>
         {project.resources.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             {project.resources.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setSelectedResource(r)}
-                className="flex items-center gap-2.5 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:border-purple-300 hover:shadow-md transition-all group text-left"
+                className="w-full sm:w-auto flex items-center gap-2.5 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:border-purple-300 hover:shadow-md transition-all group text-left"
               >
                 <div className="w-8 h-8 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center group-hover:bg-purple-700 transition">
                   {r.name[0].toUpperCase()}
@@ -370,6 +375,11 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
           <div
             className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
+            style={{
+              overscrollBehavior: "contain",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
           >
             <button
               onClick={() => setSelectedResource(null)}

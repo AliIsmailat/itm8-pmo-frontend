@@ -214,7 +214,7 @@ const ProjectActionsContainer: React.FC<Props> = ({
       </div>
 
       <form
-        className="flex flex-col gap-4 max-h-[78vh] overflow-y-auto px-1 pt-1 pb-2"
+        className="flex flex-col gap-4 px-1 pt-1 pb-2"
         onSubmit={handleSubmit}
       >
         <div className="relative">
@@ -323,7 +323,6 @@ const ProjectActionsContainer: React.FC<Props> = ({
           </p>
         )}
 
-        {/* Resource search */}
         <div className="relative">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
             <Search className="w-4 h-4 text-gray-400" />

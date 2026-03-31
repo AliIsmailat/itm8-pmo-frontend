@@ -1,46 +1,52 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 import type { Activity, ActivityStatus } from "../../utils/activities";
-import { deleteActivity } from "../../utils/activities";
+import { deleteActivity, updateActivity } from "../../utils/activities";
 import DeleteConfirmModal from "../ui/DeleteConfirmModal";
 
 const WEEK_WIDTH = 24;
 const ROW_HEIGHT = 40;
+const HANDLE_WIDTH = 8;
 
 const STATUS_CONFIG: Record<
   ActivityStatus,
-  { label: string; color: string; bar: string; dot: string }
+  { label: string; color: string; bar: string; dot: string; pending: string }
 > = {
   NotStarted: {
     label: "Ej påbörjad",
     color: "text-gray-600",
     bar: "#9ca3af",
     dot: "bg-gray-400",
+    pending: "#d1d5db",
   },
   InProgress: {
     label: "Pågående",
     color: "text-blue-700",
     bar: "#3b82f6",
     dot: "bg-blue-500",
+    pending: "#93c5fd",
   },
   OnHold: {
     label: "Pausad",
     color: "text-yellow-700",
     bar: "#f59e0b",
     dot: "bg-yellow-400",
+    pending: "#fcd34d",
   },
   Completed: {
     label: "Avslutad",
     color: "text-green-700",
     bar: "#22c55e",
     dot: "bg-green-500",
+    pending: "#86efac",
   },
   Cancelled: {
     label: "Avbruten",
     color: "text-red-600",
     bar: "#ef4444",
     dot: "bg-red-400",
+    pending: "#fca5a5",
   },
 };
 
@@ -89,26 +95,65 @@ const fmt = (d: string) => new Date(d).toLocaleDateString("sv-SE");
 const TOOLTIP_WIDTH = 240;
 const TOOLTIP_HEIGHT = 180;
 
+interface PendingChange {
+  activityId: number;
+  startDate: string;
+  endDate: string;
+  startWeek: number;
+  duration: number;
+}
+
+type DragMode = "move" | "resize-left" | "resize-right";
+
+interface DragState {
+  activityId: number;
+  mode: DragMode;
+  startX: number;
+  originalStartWeek: number;
+  originalDuration: number;
+  originalStartDate: string;
+  originalEndDate: string;
+}
+
+// Per-activity visual state during drag
+interface ActivityVisual {
+  startWeek: number;
+  duration: number;
+}
+
+// ── ActivityBar ────────────────────────────────────────────────────────────
+
 interface ActivityBarProps {
   activity: Activity;
   weekWidth: number;
+  isPending: boolean;
+  isDragging: boolean;
+  visual: ActivityVisual;
   onEdit: (a: Activity) => void;
+  onDragStart: (mode: DragMode, clientX: number) => void;
+  hasDragged: React.MutableRefObject<boolean>;
 }
 
 const ActivityBar: React.FC<ActivityBarProps> = ({
   activity,
   weekWidth,
+  isPending,
+  isDragging,
+  visual,
   onEdit,
+  onDragStart,
+  hasDragged,
 }) => {
   const [hover, setHover] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const startWeek = getISOWeek(new Date(activity.startDate));
-  const endWeek = getISOWeek(new Date(activity.endDate));
-  const duration = Math.max(1, endWeek - startWeek);
+  const startWeek = visual.startWeek;
+  const duration = visual.duration;
+  const endWeek = startWeek + duration - 1;
   const left = (startWeek - 1) * weekWidth;
   const width = duration * weekWidth;
   const cfg = STATUS_CONFIG[activity.status];
+  const barColor = isPending ? cfg.pending : cfg.bar;
 
   const margin = 12;
   const showAbove = mousePos.y - TOOLTIP_HEIGHT - margin > 0;
@@ -127,88 +172,151 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
     pointerEvents: "none",
   };
 
-  const tooltip = hover ? (
-    <div style={tooltipStyle}>
-      <div
-        className="bg-white rounded-lg text-gray-800 text-xs"
-        style={{ border: "1px solid #e5e7eb", overflow: "hidden" }}
-      >
+  const tooltip =
+    hover && !isDragging ? (
+      <div style={tooltipStyle}>
         <div
-          className="px-3 py-2 flex items-center justify-between"
-          style={{ backgroundColor: cfg.bar }}
+          className="bg-white rounded-lg text-gray-800 text-xs"
+          style={{ border: "1px solid #e5e7eb", overflow: "hidden" }}
         >
-          <span className="font-semibold text-white text-[13px] truncate">
-            {activity.name}
-          </span>
-          <span
-            className="text-white text-[10px] ml-2 px-1.5 py-0.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: "rgba(255,255,255,0.25)" }}
+          <div
+            className="px-3 py-2 flex items-center justify-between"
+            style={{ backgroundColor: cfg.bar }}
           >
-            v.{startWeek}–{endWeek}
-          </span>
-        </div>
-        <div className="px-3 py-2 flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-white text-[13px] truncate">
+              {activity.name}
+            </span>
             <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
-              style={{ backgroundColor: `${cfg.bar}22`, color: cfg.bar }}
+              className="text-white text-[10px] ml-2 px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: "rgba(255,255,255,0.25)" }}
             >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: cfg.bar }}
-              />
-              {cfg.label}
+              v.{startWeek}–{endWeek}
             </span>
           </div>
-          <div className="text-[11px] text-gray-500">
-            {fmt(activity.startDate)} → {fmt(activity.endDate)}
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <span>{activity.totalHours}h</span>
-            <span>·</span>
-            <span>{activity.billable ? "Fakturerbar" : "Ej fakturerbar"}</span>
-          </div>
-          {activity.resources.length > 0 && (
-            <div className="flex items-start gap-1 text-[11px] text-gray-600">
-              <span className="text-gray-400 flex-shrink-0">Resurser:</span>
-              <span className="font-medium">
-                {activity.resources
-                  .slice(0, 3)
-                  .map((r) => r.name.split(" ")[0])
-                  .join(", ")}
-                {activity.resources.length > 3 &&
-                  ` +${activity.resources.length - 3}`}
+          <div className="px-3 py-2 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                style={{ backgroundColor: `${cfg.bar}22`, color: cfg.bar }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: cfg.bar }}
+                />
+                {cfg.label}
               </span>
             </div>
-          )}
-          <div className="text-[10px] text-gray-400 pt-0.5 border-t border-gray-100 mt-0.5">
-            Klicka för att redigera
+            <div className="text-[11px] text-gray-500">
+              {fmt(activity.startDate)} → {fmt(activity.endDate)}
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <span>{activity.totalHours}h</span>
+              <span>·</span>
+              <span>
+                {activity.billable ? "Fakturerbar" : "Ej fakturerbar"}
+              </span>
+            </div>
+            {activity.resources.length > 0 && (
+              <div className="flex items-start gap-1 text-[11px] text-gray-600">
+                <span className="text-gray-400 flex-shrink-0">Resurser:</span>
+                <span className="font-medium">
+                  {activity.resources
+                    .slice(0, 3)
+                    .map((r) => r.name.split(" ")[0])
+                    .join(", ")}
+                  {activity.resources.length > 3 &&
+                    ` +${activity.resources.length - 3}`}
+                </span>
+              </div>
+            )}
+            <div className="text-[10px] text-gray-400 pt-0.5 border-t border-gray-100 mt-0.5">
+              Klicka för att redigera
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  ) : null;
+    ) : null;
 
   return (
     <>
       <div
-        className="absolute h-6 rounded cursor-pointer"
+        className="absolute h-6"
         style={{
           left: `${left}px`,
           top: "8px",
           width: `${width}px`,
-          backgroundColor: cfg.bar,
-          opacity: 0.85,
+          opacity: isDragging ? 0.6 : 1,
+          transition: isDragging ? "none" : "opacity 0.1s",
         }}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
-        onClick={() => onEdit(activity)}
-      />
+      >
+        {/* Left resize handle */}
+        <div
+          className="absolute top-0 bottom-0 z-10 rounded-l transition-colors"
+          style={{
+            left: 0,
+            width: `${HANDLE_WIDTH}px`,
+            cursor: "col-resize",
+            backgroundColor: hover ? "rgba(255,255,255,0.35)" : "transparent",
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragStart("resize-left", e.clientX);
+          }}
+        />
+
+        {/* Right resize handle */}
+        <div
+          className="absolute top-0 bottom-0 z-10 rounded-r transition-colors"
+          style={{
+            right: 0,
+            width: `${HANDLE_WIDTH}px`,
+            cursor: "col-resize",
+            backgroundColor: hover ? "rgba(255,255,255,0.35)" : "transparent",
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragStart("resize-right", e.clientX);
+          }}
+        />
+
+        {/* Move area */}
+        <div
+          className="absolute top-0 bottom-0"
+          style={{
+            left: `${HANDLE_WIDTH}px`,
+            right: `${HANDLE_WIDTH}px`,
+            cursor: isDragging ? "grabbing" : "grab",
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragStart("move", e.clientX);
+          }}
+          onClick={() => {
+            if (!hasDragged.current) onEdit(activity);
+          }}
+        />
+
+        {/* Visual bar */}
+        <div className="relative h-full w-full pointer-events-none">
+          <div
+            className="absolute h-full rounded left-0 top-0 transition-colors"
+            style={{ width: `${width}px`, backgroundColor: barColor }}
+          />
+        </div>
+      </div>
+
       {typeof document !== "undefined" && createPortal(tooltip, document.body)}
     </>
   );
 };
+
+// ── ActivityTimeline ───────────────────────────────────────────────────────
 
 interface Props {
   activities: Activity[];
@@ -228,10 +336,214 @@ const ActivityTimeline: React.FC<Props> = ({
   const [activeFilters, setActiveFilters] = useState<Set<ActivityStatus>>(
     new Set(ALL_STATUSES),
   );
+  const [pendingChanges, setPendingChanges] = useState<
+    Record<number, PendingChange>
+  >({});
+  const [savingPending, setSavingPending] = useState(false);
+  const [yearClampWarning, setYearClampWarning] = useState(false);
+
+  // Per-activity visual overrides during drag
+  const [visualOverrides, setVisualOverrides] = useState<
+    Record<number, ActivityVisual>
+  >({});
+  const dragRef = useRef<DragState | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const hasDraggedRef = useRef(false);
 
   useEffect(() => {
     setActivities(initialActivities);
   }, [initialActivities]);
+
+  const getVisual = (activity: Activity): ActivityVisual => {
+    if (visualOverrides[activity.id]) return visualOverrides[activity.id];
+    if (pendingChanges[activity.id]) {
+      return {
+        startWeek: pendingChanges[activity.id].startWeek,
+        duration: pendingChanges[activity.id].duration,
+      };
+    }
+    const startWeek = getISOWeek(new Date(activity.startDate));
+    const endWeek = getISOWeek(new Date(activity.endDate));
+    return { startWeek, duration: Math.max(1, endWeek - startWeek) };
+  };
+
+  const handleDragStart = useCallback(
+    (activity: Activity, mode: DragMode, clientX: number) => {
+      const pending = pendingChanges[activity.id];
+      const startWeek =
+        pending?.startWeek ?? getISOWeek(new Date(activity.startDate));
+      const endWeek = pending
+        ? pending.startWeek + pending.duration
+        : getISOWeek(new Date(activity.endDate));
+      const duration = Math.max(1, endWeek - startWeek);
+      // const year = new Date(activity.startDate).getFullYear();
+
+      dragRef.current = {
+        activityId: activity.id,
+        mode,
+        startX: clientX,
+        originalStartWeek: startWeek,
+        originalDuration: duration,
+        originalStartDate: pending?.startDate ?? activity.startDate,
+        originalEndDate: pending?.endDate ?? activity.endDate,
+        // originalYear: year,
+      };
+      hasDraggedRef.current = false;
+      setDraggingId(activity.id);
+      setYearClampWarning(false);
+    },
+    [pendingChanges],
+  );
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    const { mode, startX, originalStartWeek, originalDuration } =
+      dragRef.current;
+    const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
+    if (deltaWeeks === 0) return;
+    hasDraggedRef.current = true;
+
+    const minWeek = 1;
+    const maxWeek = 52;
+    let newStart = originalStartWeek;
+    let newDuration = originalDuration;
+    let clamped = false;
+
+    if (mode === "move") {
+      newStart = originalStartWeek + deltaWeeks;
+      if (newStart < minWeek) {
+        newStart = minWeek;
+        clamped = true;
+      }
+      if (newStart + newDuration - 1 > maxWeek) {
+        newStart = maxWeek - newDuration + 1;
+        clamped = true;
+      }
+    } else if (mode === "resize-right") {
+      newDuration = Math.max(
+        1,
+        Math.min(
+          originalDuration + deltaWeeks,
+          maxWeek - originalStartWeek + 1,
+        ),
+      );
+      if (newDuration !== originalDuration + deltaWeeks) clamped = true;
+    } else if (mode === "resize-left") {
+      const rawStart = originalStartWeek + deltaWeeks;
+      newStart = Math.max(
+        minWeek,
+        Math.min(rawStart, originalStartWeek + originalDuration - 1),
+      );
+      newDuration = Math.max(
+        1,
+        originalDuration - (newStart - originalStartWeek),
+      );
+      if (newStart !== rawStart) clamped = true;
+    }
+
+    setYearClampWarning(clamped);
+    setVisualOverrides((prev) => ({
+      ...prev,
+      [dragRef.current!.activityId]: {
+        startWeek: newStart,
+        duration: newDuration,
+      },
+    }));
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (!dragRef.current) return;
+    const {
+      activityId,
+      mode,
+      originalStartWeek,
+      originalDuration,
+      originalStartDate,
+      originalEndDate,
+    } = dragRef.current;
+    dragRef.current = null;
+    setDraggingId(null);
+
+    const visual = visualOverrides[activityId];
+    if (!visual) return;
+
+    const didMove =
+      visual.startWeek !== originalStartWeek ||
+      visual.duration !== originalDuration;
+    if (!didMove) {
+      setVisualOverrides((prev) => {
+        const n = { ...prev };
+        delete n[activityId];
+        return n;
+      });
+      return;
+    }
+
+    const startDelta = (visual.startWeek - originalStartWeek) * 7;
+    const durationDelta = (visual.duration - originalDuration) * 7;
+
+    const newStart = new Date(originalStartDate);
+    const newEnd = new Date(originalEndDate);
+
+    if (mode === "move") {
+      newStart.setUTCDate(newStart.getUTCDate() + startDelta);
+      newEnd.setUTCDate(newEnd.getUTCDate() + startDelta);
+    } else if (mode === "resize-right") {
+      newEnd.setUTCDate(newEnd.getUTCDate() + durationDelta);
+    } else if (mode === "resize-left") {
+      newStart.setUTCDate(newStart.getUTCDate() + startDelta);
+    }
+
+    setPendingChanges((prev) => ({
+      ...prev,
+      [activityId]: {
+        activityId,
+        startDate: newStart.toISOString(),
+        endDate: newEnd.toISOString(),
+        startWeek: visual.startWeek,
+        duration: visual.duration,
+      },
+    }));
+    setVisualOverrides((prev) => {
+      const n = { ...prev };
+      delete n[activityId];
+      return n;
+    });
+  }, [visualOverrides]);
+
+  const saveAll = async () => {
+    setSavingPending(true);
+    try {
+      await Promise.all(
+        Object.values(pendingChanges).map((c) =>
+          updateActivity(c.activityId, {
+            startDate: c.startDate,
+            endDate: c.endDate,
+          }),
+        ),
+      );
+      // Update stored dates so future drags use correct originals
+      setActivities((prev) =>
+        prev.map((a) => {
+          const change = pendingChanges[a.id];
+          if (!change) return a;
+          return { ...a, startDate: change.startDate, endDate: change.endDate };
+        }),
+      );
+      setPendingChanges({});
+      setYearClampWarning(false);
+    } catch (err) {
+      console.error("Failed to save activity changes:", err);
+    } finally {
+      setSavingPending(false);
+    }
+  };
+
+  const discardAll = () => {
+    setPendingChanges({});
+    setVisualOverrides({});
+    setYearClampWarning(false);
+  };
 
   const handleDelete = async (id: number) => {
     setConfirmId(null);
@@ -258,15 +570,8 @@ const ActivityTimeline: React.FC<Props> = ({
 
   const toggleFilter = (status: ActivityStatus) => {
     setActiveFilters((prev) => {
-      // If all are active, isolate just this one
-      if (prev.size === ALL_STATUSES.length) {
-        return new Set([status]);
-      }
-      // If only this one is active, reset to all
-      if (prev.size === 1 && prev.has(status)) {
-        return new Set(ALL_STATUSES);
-      }
-      // Otherwise add or remove it
+      if (prev.size === ALL_STATUSES.length) return new Set([status]);
+      if (prev.size === 1 && prev.has(status)) return new Set(ALL_STATUSES);
       const next = new Set(prev);
       if (next.has(status)) {
         next.delete(status);
@@ -277,20 +582,23 @@ const ActivityTimeline: React.FC<Props> = ({
     });
   };
 
-  const toggleAll = () => {
-    setActiveFilters(new Set(ALL_STATUSES));
-  };
+  const toggleAll = () => setActiveFilters(new Set(ALL_STATUSES));
 
   const currentWeek = getCurrentWeek();
   const months = getMonthSpans();
   const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
   const allActive = activeFilters.size === ALL_STATUSES.length;
-
   const visibleStatuses = ALL_STATUSES.filter((s) => activeFilters.has(s));
+  const hasPending = Object.keys(pendingChanges).length > 0;
 
   return (
     <>
-      <div className="rounded-xl bg-white shadow text-sm overflow-hidden">
+      <div
+        className="rounded-xl bg-white shadow text-sm overflow-hidden"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         {/* Toolbar */}
         <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b gap-4">
           <h2 className="font-semibold text-base flex-shrink-0">Aktiviteter</h2>
@@ -373,7 +681,6 @@ const ActivityTimeline: React.FC<Props> = ({
 
             return (
               <React.Fragment key={status}>
-                {/* Status group header */}
                 <div
                   className="grid border-t"
                   style={{
@@ -402,60 +709,72 @@ const ActivityTimeline: React.FC<Props> = ({
                   ))}
                 </div>
 
-                {/* Activity rows in this group */}
-                {group.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="grid relative border-t"
-                    style={{
-                      gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)`,
-                    }}
-                  >
+                {group.map((activity) => {
+                  const visual = getVisual(activity);
+                  const isPending = !!pendingChanges[activity.id];
+                  const isDragging = draggingId === activity.id;
+
+                  return (
                     <div
-                      className="border-r px-3 py-1 flex items-center gap-2"
-                      style={{ height: `${ROW_HEIGHT}px` }}
+                      key={activity.id}
+                      className="grid relative border-t"
+                      style={{
+                        gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)`,
+                      }}
                     >
                       <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: cfg.bar }}
-                      />
-                      <div className="text-[13px] border-l pl-2 border-gray-300 font-medium truncate flex-1">
-                        {activity.name}
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => onEdit(activity)}
-                          className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-purple-600 transition"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => setConfirmId(activity.id)}
-                          className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500 transition"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    {weeks.map((w) => (
-                      <div
-                        key={w}
-                        className={`border-l ${w === currentWeek ? "bg-purple-50" : w % 2 === 0 ? "bg-gray-50/40" : ""}`}
+                        className="border-r px-3 py-1 flex items-center gap-2"
                         style={{ height: `${ROW_HEIGHT}px` }}
-                      />
-                    ))}
-                    <div
-                      className="absolute top-0 bottom-0"
-                      style={{ left: "160px", right: 0 }}
-                    >
-                      <ActivityBar
-                        activity={activity}
-                        weekWidth={WEEK_WIDTH}
-                        onEdit={onEdit}
-                      />
+                      >
+                        <div
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cfg.bar }}
+                        />
+                        <div className="text-[13px] border-l pl-2 border-gray-300 font-medium truncate flex-1">
+                          {activity.name}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => onEdit(activity)}
+                            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-purple-600 transition"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmId(activity.id)}
+                            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500 transition"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      {weeks.map((w) => (
+                        <div
+                          key={w}
+                          className={`border-l ${w === currentWeek ? "bg-purple-50" : w % 2 === 0 ? "bg-gray-50/40" : ""}`}
+                          style={{ height: `${ROW_HEIGHT}px` }}
+                        />
+                      ))}
+                      <div
+                        className="absolute top-0 bottom-0"
+                        style={{ left: "160px", right: 0 }}
+                      >
+                        <ActivityBar
+                          activity={activity}
+                          weekWidth={WEEK_WIDTH}
+                          isPending={isPending}
+                          isDragging={isDragging}
+                          visual={visual}
+                          onEdit={onEdit}
+                          onDragStart={(mode, clientX) =>
+                            handleDragStart(activity, mode, clientX)
+                          }
+                          hasDragged={hasDraggedRef}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </React.Fragment>
             );
           })}
@@ -475,6 +794,44 @@ const ActivityTimeline: React.FC<Props> = ({
         onConfirm={() => confirmId !== null && handleDelete(confirmId)}
         onCancel={() => setConfirmId(null)}
       />
+
+      {/* Floating bottom save bar */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-4 px-6 py-4 bg-white border-t border-gray-200 shadow-lg transition-transform duration-300 ease-in-out ${
+          hasPending || yearClampWarning ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        {yearClampWarning && (
+          <span className="text-amber-600 font-medium text-xs">
+            ⚠ Aktiviteten kan inte dras utanför vecka 1–52
+          </span>
+        )}
+        {hasPending && (
+          <>
+            <span className="text-gray-400 text-xs">
+              {Object.keys(pendingChanges).length}{" "}
+              {Object.keys(pendingChanges).length === 1
+                ? "osparad ändring"
+                : "osparade ändringar"}
+            </span>
+            <button
+              onClick={discardAll}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              <X className="w-3.5 h-3.5" />
+              Ångra
+            </button>
+            <button
+              onClick={saveAll}
+              disabled={savingPending}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition disabled:opacity-50"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {savingPending ? "Sparar..." : "Spara ändringar"}
+            </button>
+          </>
+        )}
+      </div>
     </>
   );
 };
