@@ -41,6 +41,15 @@ interface DragState {
   phaseYear: number;
 }
 
+interface PendingChange {
+  phaseId: number;
+  phaseIdx: number;
+  startDate: string;
+  endDate: string;
+  startWeek: number;
+  duration: number;
+}
+
 function getMonthSpans() {
   return [
     { name: "Jan", span: 4 },
@@ -96,16 +105,6 @@ function weekToEndDate(
   return d.toISOString();
 }
 
-function phasesOverlap(
-  aStart: number,
-  aDuration: number,
-  bStart: number,
-  bDuration: number,
-): boolean {
-  // Intervals are [start, start+duration) — exclusive end
-  return aStart < bStart + bDuration && bStart < aStart + aDuration;
-}
-
 const inputClass =
   "border border-gray-200 rounded-lg p-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50";
 
@@ -127,6 +126,10 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [yearClampError, setYearClampError] = useState<string | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<
+    Record<number, PendingChange>
+  >({});
+  const [savingPending, setSavingPending] = useState(false);
 
   // Drag state
   const dragRef = useRef<DragState | null>(null);
@@ -144,6 +147,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const currentWeek = getISOWeek();
   const months = getMonthSpans();
   const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
+  const hasPending = Object.keys(pendingChanges).length > 0;
 
   useEffect(() => {
     getResources().then(setAllResources).catch(console.error);
@@ -162,14 +166,16 @@ const GanttChart: React.FC<GanttChartProps> = ({
       clientX: number,
     ) => {
       const phase = phases[phaseIdx];
+      // Use pending state as base if it exists
+      const pending = pendingChanges[phase.id];
       dragRef.current = {
         phaseIdx,
         type,
         startX: clientX,
-        originalStartWeek: phase.startWeek,
-        originalDuration: phase.duration,
-        originalStartDate: phase.startDate,
-        originalEndDate: phase.endDate,
+        originalStartWeek: pending?.startWeek ?? phase.startWeek,
+        originalDuration: pending?.duration ?? phase.duration,
+        originalStartDate: pending?.startDate ?? phase.startDate,
+        originalEndDate: pending?.endDate ?? phase.endDate,
         phaseYear: (() => {
           const mid = new Date(
             (new Date(phase.startDate).getTime() +
@@ -182,7 +188,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
       hasDraggedRef.current = false;
       setDraggingIdx(phaseIdx);
     },
-    [phases],
+    [phases, pendingChanges],
   );
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -199,10 +205,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
     if (deltaWeeks === 0) return;
     hasDraggedRef.current = true;
 
-    // Clamp to weeks that keep the phase within its original year, max 52
     const yearStart = getISOWeek(new Date(Date.UTC(phaseYear, 0, 4)));
     const minWeek = yearStart;
-    const maxWeek = 52; // Gantt only renders 52 columns
+    const maxWeek = 52;
 
     setPhases((prev) => {
       const updated = [...prev];
@@ -260,31 +265,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
       phase.startWeek !== originalStartWeek ||
       phase.duration !== originalDuration;
 
-    // Check overlap against all other phases
-    const hasOverlap = phases.some((other, idx) => {
-      if (idx === phaseIdx) return false;
-      return phasesOverlap(
-        phase.startWeek,
-        phase.duration,
-        other.startWeek,
-        other.duration,
-      );
-    });
-
-    if (hasOverlap) {
-      setPhases((prev) => {
-        const updated = [...prev];
-        updated[phaseIdx] = {
-          ...updated[phaseIdx],
-          startWeek: originalStartWeek,
-          duration: originalDuration,
-        };
-        return updated;
-      });
-      return;
-    }
-
-    // Only save if actually moved
     if (!didMove) return;
 
     const startWeekDelta = phase.startWeek - originalStartWeek;
@@ -292,107 +272,81 @@ const GanttChart: React.FC<GanttChartProps> = ({
     const startDayDelta = startWeekDelta * 7;
     const durationDayDelta = durationDelta * 7;
 
-    // Calculate new dates based on drag type
     const newStart = new Date(originalStartDate);
     const newEnd = new Date(originalEndDate);
 
     if (type === "move") {
-      // Both dates shift by same amount
       newStart.setUTCDate(newStart.getUTCDate() + startDayDelta);
       newEnd.setUTCDate(newEnd.getUTCDate() + startDayDelta);
     } else if (type === "resize-right") {
-      // Only end date changes
       newEnd.setUTCDate(newEnd.getUTCDate() + durationDayDelta);
     } else if (type === "resize-left") {
-      // Start shifts, end stays fixed
       newStart.setUTCDate(newStart.getUTCDate() + startDayDelta);
     }
 
-    const newStartDate = newStart.toISOString();
-    const newEndDate = newEnd.toISOString();
-
-    // Check actual date overlap against all other phases using real DB dates
-    const hasDateOverlap = phases.some((p, i) => {
-      if (i === phaseIdx) return false;
-      return new Date(p.startDate) < newEnd && new Date(p.endDate) > newStart;
-    });
-
-    console.log("Drag attempt:", {
-      name: phase.name,
-      type,
-      startWeekDelta,
-      durationDelta,
-      newStartDate,
-      newEndDate,
-      hasDateOverlap,
-      conflictsWith: phases
-        .filter(
-          (p, i) =>
-            i !== phaseIdx &&
-            new Date(p.startDate) < newEnd &&
-            new Date(p.endDate) > newStart,
-        )
-        .map((p) => ({
-          name: p.name,
-          startDate: p.startDate,
-          endDate: p.endDate,
-        })),
-    });
-
-    if (hasDateOverlap) {
-      setPhases((prev) => {
-        const updated = [...prev];
-        updated[phaseIdx] = {
-          ...updated[phaseIdx],
-          startWeek: originalStartWeek,
-          duration: originalDuration,
-        };
-        return updated;
-      });
-      return;
-    }
-
-    // Save to backend — don't call onPhasesChanged to avoid reorder from refetch
-    try {
-      console.log("Saving:", {
-        id: phase.id,
-        name: phase.name,
-        type,
-        newStartDate,
-        newEndDate,
-      });
-      await updatePhase(phase.id, {
-        name: phase.name,
-        startDate: newStartDate,
-        endDate: newEndDate,
-      });
-      // Update stored dates on the phase so future drags use correct originals
-      if (didMove) {
-        setPhases((prev) => {
-          const updated = [...prev];
-          updated[phaseIdx] = {
-            ...updated[phaseIdx],
-            startDate: newStartDate,
-            endDate: newEndDate,
-          };
-          return updated;
-        });
-      }
-    } catch (err) {
-      console.error("Failed to save phase drag:", err);
-      if (axios.isAxiosError(err))
-        console.error("Drag save response:", err.response?.data);
-      setPhases((prev) => {
-        const updated = [...prev];
-        updated[phaseIdx] = {
-          ...updated[phaseIdx],
-          startWeek: originalStartWeek,
-          duration: originalDuration,
-        };
-        return updated;
-      });
-    }
+    // Store as pending instead of saving immediately
+    setPendingChanges((prev) => ({
+      ...prev,
+      [phase.id]: {
+        phaseId: phase.id,
+        phaseIdx,
+        startDate: newStart.toISOString(),
+        endDate: newEnd.toISOString(),
+        startWeek: phase.startWeek,
+        duration: phase.duration,
+      },
+    }));
   }, [phases]);
+
+  const saveAll = async () => {
+    setSavingPending(true);
+    try {
+      await Promise.all(
+        Object.values(pendingChanges).map((c) =>
+          updatePhase(c.phaseId, {
+            startDate: c.startDate,
+            endDate: c.endDate,
+          }),
+        ),
+      );
+      // Update stored dates on phases so future drags use correct originals
+      setPhases((prev) =>
+        prev.map((p) => {
+          const change = pendingChanges[p.id];
+          if (!change) return p;
+          return { ...p, startDate: change.startDate, endDate: change.endDate };
+        }),
+      );
+      setPendingChanges({});
+      setYearClampError(null);
+    } catch (err) {
+      console.error("Failed to save phase changes:", err);
+      if (axios.isAxiosError(err))
+        console.error("Response:", err.response?.data);
+    } finally {
+      setSavingPending(false);
+    }
+  };
+
+  const discardAll = () => {
+    // Revert visual positions
+    setPhases((prev) =>
+      prev.map((p) => {
+        const change = pendingChanges[p.id];
+        if (!change) return p;
+        return {
+          ...p,
+          startWeek:
+            initialPhases.find((ip) => ip.id === p.id)?.startWeek ??
+            p.startWeek,
+          duration:
+            initialPhases.find((ip) => ip.id === p.id)?.duration ?? p.duration,
+        };
+      }),
+    );
+    setPendingChanges({});
+    setYearClampError(null);
+  };
 
   // ── Edit / save ────────────────────────────────────────────────────────────
 
@@ -490,11 +444,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
       setFormError(null);
     } catch (err) {
       console.error("Failed to create phase:", err);
-      const message =
-        axios.isAxiosError(err) && typeof err.response?.data === "string"
-          ? "Fasens datum överlappar med en befintlig fas i projektet."
-          : "Kunde inte skapa fasen.";
-      setFormError(message);
+      setFormError("Kunde inte skapa fasen.");
     } finally {
       setSaving(false);
     }
@@ -526,487 +476,535 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const phaseKey = (p: GanttPhase) => p.id.toString();
 
   return (
-    <div
-      className="rounded-xl bg-white shadow text-sm overflow-hidden"
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Toolbar */}
-      <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b flex-wrap gap-2">
-        <h2 className="font-semibold text-base">Tidsplan</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          {yearClampError && (
-            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
-              {yearClampError}
-            </span>
-          )}
-          <button
-            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-            onClick={() => setShowResourceModal(true)}
+    <>
+      <div
+        className="rounded-xl bg-white shadow text-sm overflow-hidden"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {/* Toolbar */}
+        <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b flex-wrap gap-2">
+          <h2 className="font-semibold text-base">Tidsplan</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            {yearClampError && (
+              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                {yearClampError}
+              </span>
+            )}
+            <button
+              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+              onClick={() => setShowResourceModal(true)}
+            >
+              <Users className="w-3.5 h-3.5 text-purple-600" />
+              <span className="hidden sm:inline">Allokera resurser</span>
+            </button>
+            <button
+              className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
+              onClick={() => setShowAddModal(true)}
+            >
+              <Plus className="w-3.5 h-3.5 text-purple-600" />
+              <span className="hidden sm:inline">Lägg till fas</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          {/* Month header */}
+          <div
+            className="grid bg-gray-50 border-b"
+            style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
           >
-            <Users className="w-3.5 h-3.5 text-purple-600" />
-            <span className="hidden sm:inline">Allokera resurser</span>
-          </button>
-          <button
-            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 text-sm shadow-sm"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus className="w-3.5 h-3.5 text-purple-600" />
-            <span className="hidden sm:inline">Lägg till fas</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        {/* Month header */}
-        <div
-          className="grid bg-gray-50 border-b"
-          style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
-        >
-          <div className="p-2 font-semibold border-r">Fas</div>
-          {months.map((m) => (
-            <div
-              key={m.name}
-              className="text-center border-l font-medium py-2"
-              style={{ gridColumn: `span ${m.span}` }}
-            >
-              {m.name}
-            </div>
-          ))}
-        </div>
-
-        {/* Week header */}
-        <div
-          className="grid bg-gray-50 border-b"
-          style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
-        >
-          <div className="border-r" />
-          {weeks.map((w) => (
-            <div
-              key={w}
-              className={`text-center border-l py-1 text-[13px] ${w === currentWeek ? "bg-purple-200 font-bold" : ""}`}
-            >
-              {w}
-            </div>
-          ))}
-        </div>
-
-        {/* Phase rows */}
-        {phases.map((phase, idx) => {
-          const key = phaseKey(phase);
-          const allocatedCount = (phaseResourceMap[key] ?? []).length;
-          return (
-            <div
-              key={phase.id}
-              className="grid relative border-t"
-              style={{
-                gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)`,
-              }}
-            >
+            <div className="p-2 font-semibold border-r">Fas</div>
+            {months.map((m) => (
               <div
-                className="border-r px-3 py-1 flex items-center gap-2"
-                style={{ height: `${ROW_HEIGHT}px` }}
+                key={m.name}
+                className="text-center border-l font-medium py-2"
+                style={{ gridColumn: `span ${m.span}` }}
               >
-                <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0" />
-                <div className="text-[14px] border-l pl-2 border-gray-300 font-medium truncate flex-1">
-                  {phase.name}
-                </div>
-                {allocatedCount > 0 && (
-                  <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                    {allocatedCount}
-                  </span>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteConfirmId(phase.id);
-                  }}
-                  className="text-gray-400 hover:text-red-500 flex-shrink-0 transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {m.name}
               </div>
+            ))}
+          </div>
 
-              {weeks.map((w) => (
+          {/* Week header */}
+          <div
+            className="grid bg-gray-50 border-b"
+            style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
+          >
+            <div className="border-r" />
+            {weeks.map((w) => (
+              <div
+                key={w}
+                className={`text-center border-l py-1 text-[13px] ${w === currentWeek ? "bg-purple-200 font-bold" : ""}`}
+              >
+                {w}
+              </div>
+            ))}
+          </div>
+
+          {/* Phase rows */}
+          {phases.map((phase, idx) => {
+            const key = phaseKey(phase);
+            const allocatedCount = (phaseResourceMap[key] ?? []).length;
+            const isPending = !!pendingChanges[phase.id];
+            return (
+              <div
+                key={phase.id}
+                className="grid relative border-t"
+                style={{
+                  gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)`,
+                }}
+              >
                 <div
-                  key={w}
-                  className={`border-l ${w === currentWeek ? "bg-purple-50" : w % 2 === 0 ? "bg-gray-50/40" : ""}`}
+                  className="border-r px-3 py-1 flex items-center gap-2"
                   style={{ height: `${ROW_HEIGHT}px` }}
-                />
-              ))}
+                >
+                  <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0" />
+                  <div className="text-[14px] border-l pl-2 border-gray-300 font-medium truncate flex-1">
+                    {phase.name}
+                  </div>
+                  {allocatedCount > 0 && (
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                      {allocatedCount}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmId(phase.id);
+                    }}
+                    className="text-gray-400 hover:text-red-500 flex-shrink-0 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-              <div
-                className="absolute top-0 bottom-0"
-                style={{ left: "160px", right: 0 }}
-              >
-                <PhaseBlock
-                  {...phase}
-                  top={0}
-                  weekWidth={WEEK_WIDTH}
-                  onEdit={(p) => {
-                    const full = phases.find((ph) => ph.name === p.name);
-                    if (full) handleEdit(full);
-                  }}
-                  onDragStart={(type, clientX) =>
-                    handleDragStart(idx, type, clientX)
-                  }
-                  isDragging={draggingIdx === idx}
-                  hasDragged={hasDraggedRef}
-                  resources={(phaseResourceMap[key] ?? [])
-                    .map(
-                      (id) => allResources.find((r) => r.id === id)?.name ?? "",
-                    )
-                    .filter(Boolean)}
-                />
+                {weeks.map((w) => (
+                  <div
+                    key={w}
+                    className={`border-l ${w === currentWeek ? "bg-purple-50" : w % 2 === 0 ? "bg-gray-50/40" : ""}`}
+                    style={{ height: `${ROW_HEIGHT}px` }}
+                  />
+                ))}
+
+                <div
+                  className="absolute top-0 bottom-0"
+                  style={{ left: "160px", right: 0 }}
+                >
+                  <PhaseBlock
+                    {...phase}
+                    top={0}
+                    weekWidth={WEEK_WIDTH}
+                    isPending={isPending}
+                    onEdit={(p) => {
+                      const full = phases.find((ph) => ph.name === p.name);
+                      if (full) handleEdit(full);
+                    }}
+                    onDragStart={(type, clientX) =>
+                      handleDragStart(idx, type, clientX)
+                    }
+                    isDragging={draggingIdx === idx}
+                    hasDragged={hasDraggedRef}
+                    resources={(phaseResourceMap[key] ?? [])
+                      .map(
+                        (id) =>
+                          allResources.find((r) => r.id === id)?.name ?? "",
+                      )
+                      .filter(Boolean)}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {phases.length === 0 && (
+            <div className="py-10 text-center text-sm text-gray-400">
+              Inga faser tillagda ännu
+            </div>
+          )}
+        </div>
+
+        {/* ── Edit modal ── */}
+        {selectedPhase && (
+          <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            onClick={() => setSelectedPhase(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
+            >
+              <div className="h-1 w-full bg-purple-600" />
+              <div className="p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  Redigera fas
+                </h3>
+                <div className="flex flex-col gap-3 mb-5">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      Namn
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedPhase.name}
+                      onChange={(e) =>
+                        setSelectedPhase({
+                          ...selectedPhase,
+                          name: e.target.value,
+                        })
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      Förbrukade veckor
+                    </label>
+                    <input
+                      type="number"
+                      value={selectedPhase.usedWeeks ?? ""}
+                      onChange={(e) =>
+                        setSelectedPhase({
+                          ...selectedPhase,
+                          usedWeeks: Number(e.target.value),
+                        })
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      Status
+                    </label>
+                    <select
+                      value={selectedPhase.status ?? ""}
+                      onChange={(e) =>
+                        setSelectedPhase({
+                          ...selectedPhase,
+                          status:
+                            e.target.value === ""
+                              ? undefined
+                              : (e.target.value as Phase["status"]),
+                        })
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">Automatisk</option>
+                      <option value="onTime">I tid</option>
+                      <option value="risk">Risk</option>
+                      <option value="delayed">Försenad</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm transition"
+                    onClick={() => setSelectedPhase(null)}
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    disabled={saving}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm disabled:opacity-60 transition"
+                    onClick={handleSave}
+                  >
+                    {saving ? "Sparar..." : "Spara"}
+                  </button>
+                </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        )}
 
-        {phases.length === 0 && (
-          <div className="py-10 text-center text-sm text-gray-400">
-            Inga faser tillagda ännu
+        {/* ── Add modal ── */}
+        {showAddModal && (
+          <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowAddModal(false);
+              setFormError(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
+            >
+              <div className="h-1 w-full bg-purple-600" />
+              <div className="p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  Lägg till fas
+                </h3>
+                <div className="flex flex-col gap-3 mb-5">
+                  <input
+                    type="text"
+                    placeholder="Fas namn"
+                    value={formData.name}
+                    onChange={(e) => {
+                      setFormData((p) => ({ ...p, name: e.target.value }));
+                      setFormError(null);
+                    }}
+                    className={inputClass}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">
+                        Startdatum
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => {
+                          setFormData((p) => ({
+                            ...p,
+                            startDate: e.target.value,
+                          }));
+                          setFormError(null);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">
+                        Slutdatum
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => {
+                          setFormData((p) => ({
+                            ...p,
+                            endDate: e.target.value,
+                          }));
+                          setFormError(null);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                  {formError && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl px-3 py-2.5">
+                      <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm transition"
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setFormError(null);
+                    }}
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    disabled={saving}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm disabled:opacity-60 transition"
+                    onClick={handleAddPhase}
+                  >
+                    {saving ? "Sparar..." : "Lägg till"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Delete confirm ── */}
+        <DeleteConfirmModal
+          isOpen={deleteConfirmId !== null}
+          entityName={phases.find((p) => p.id === deleteConfirmId)?.name}
+          onConfirm={() =>
+            deleteConfirmId !== null && handleDeletePhase(deleteConfirmId)
+          }
+          onCancel={() => setDeleteConfirmId(null)}
+        />
+
+        {/* ── Resource allocation modal ── */}
+        {showResourceModal && (
+          <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            onClick={() => {
+              setShowResourceModal(false);
+              setSelectedPhaseForResources(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 sm:mx-0 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
+            >
+              <div className="h-1 w-full bg-purple-600" />
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-semibold text-gray-900">
+                    Allokera resurser
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowResourceModal(false);
+                      setSelectedPhaseForResources(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {!selectedPhaseForResources ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Välj en fas för att tilldela resurser
+                    </p>
+                    <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                      {phases.length === 0 && (
+                        <p className="text-sm text-gray-400 py-4 text-center">
+                          Inga faser att allokera till
+                        </p>
+                      )}
+                      {phases.map((phase) => {
+                        const key = phaseKey(phase);
+                        const count = (phaseResourceMap[key] ?? []).length;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setSelectedPhaseForResources(phase)}
+                            className="flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-purple-50 border border-gray-200 hover:border-purple-300 rounded-xl transition text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                              <span className="text-sm font-medium text-gray-700">
+                                {phase.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {count > 0 && (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                                  {count} resurs{count > 1 ? "er" : ""}
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-400">
+                                Välj →
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setSelectedPhaseForResources(null)}
+                      className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 mb-3 transition"
+                    >
+                      ← Tillbaka
+                    </button>
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      Resurser för{" "}
+                      <span className="text-purple-600">
+                        {selectedPhaseForResources.name}
+                      </span>
+                    </p>
+                    <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                      {allResources.length === 0 && (
+                        <p className="text-sm text-gray-400 py-4 text-center">
+                          Inga resurser hittades
+                        </p>
+                      )}
+                      {allResources.map((r) => {
+                        const key = phaseKey(selectedPhaseForResources);
+                        const selected = (phaseResourceMap[key] ?? []).includes(
+                          r.id,
+                        );
+                        return (
+                          <button
+                            key={r.id}
+                            onClick={() => toggleResourceForPhase(key, r.id)}
+                            className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition ${
+                              selected
+                                ? "bg-purple-50 border-purple-300"
+                                : "bg-gray-50 border-gray-200 hover:border-purple-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">
+                                {r.name[0].toUpperCase()}
+                              </div>
+                              <div className="text-left">
+                                <div className="text-sm font-medium text-gray-700">
+                                  {r.name}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {r.clLevel} · {r.location}
+                                </div>
+                              </div>
+                            </div>
+                            {selected && (
+                              <Check className="w-4 h-4 text-purple-600" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-end mt-4">
+                      <button
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm transition"
+                        onClick={() => setSelectedPhaseForResources(null)}
+                      >
+                        Klar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* ── Edit modal ── */}
-      {selectedPhase && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setSelectedPhase(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            onWheel={(e) => e.stopPropagation()}
-          >
-            <div className="h-1 w-full bg-purple-600" />
-            <div className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Redigera fas</h3>
-              <div className="flex flex-col gap-3 mb-5">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">
-                    Namn
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedPhase.name}
-                    onChange={(e) =>
-                      setSelectedPhase({
-                        ...selectedPhase,
-                        name: e.target.value,
-                      })
-                    }
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">
-                    Förbrukade veckor
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedPhase.usedWeeks ?? ""}
-                    onChange={(e) =>
-                      setSelectedPhase({
-                        ...selectedPhase,
-                        usedWeeks: Number(e.target.value),
-                      })
-                    }
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">
-                    Status
-                  </label>
-                  <select
-                    value={selectedPhase.status ?? ""}
-                    onChange={(e) =>
-                      setSelectedPhase({
-                        ...selectedPhase,
-                        status:
-                          e.target.value === ""
-                            ? undefined
-                            : (e.target.value as Phase["status"]),
-                      })
-                    }
-                    className={inputClass}
-                  >
-                    <option value="">Automatisk</option>
-                    <option value="onTime">I tid</option>
-                    <option value="risk">Risk</option>
-                    <option value="delayed">Försenad</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm transition"
-                  onClick={() => setSelectedPhase(null)}
-                >
-                  Avbryt
-                </button>
-                <button
-                  disabled={saving}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm disabled:opacity-60 transition"
-                  onClick={handleSave}
-                >
-                  {saving ? "Sparar..." : "Spara"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Add modal ── */}
-      {showAddModal && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowAddModal(false);
-            setFormError(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 sm:mx-0 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            onWheel={(e) => e.stopPropagation()}
-          >
-            <div className="h-1 w-full bg-purple-600" />
-            <div className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Lägg till fas
-              </h3>
-              <div className="flex flex-col gap-3 mb-5">
-                <input
-                  type="text"
-                  placeholder="Fas namn"
-                  value={formData.name}
-                  onChange={(e) => {
-                    setFormData((p) => ({ ...p, name: e.target.value }));
-                    setFormError(null);
-                  }}
-                  className={inputClass}
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">
-                      Startdatum
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => {
-                        setFormData((p) => ({
-                          ...p,
-                          startDate: e.target.value,
-                        }));
-                        setFormError(null);
-                      }}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">
-                      Slutdatum
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => {
-                        setFormData((p) => ({ ...p, endDate: e.target.value }));
-                        setFormError(null);
-                      }}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-                {formError && (
-                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl px-3 py-2.5">
-                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span>{formError}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm transition"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setFormError(null);
-                  }}
-                >
-                  Avbryt
-                </button>
-                <button
-                  disabled={saving}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm disabled:opacity-60 transition"
-                  onClick={handleAddPhase}
-                >
-                  {saving ? "Sparar..." : "Lägg till"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Delete confirm ── */}
-      <DeleteConfirmModal
-        isOpen={deleteConfirmId !== null}
-        entityName={phases.find((p) => p.id === deleteConfirmId)?.name}
-        onConfirm={() =>
-          deleteConfirmId !== null && handleDeletePhase(deleteConfirmId)
-        }
-        onCancel={() => setDeleteConfirmId(null)}
-      />
-
-      {/* ── Resource allocation modal ── */}
-      {showResourceModal && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowResourceModal(false);
-            setSelectedPhaseForResources(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 sm:mx-0 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            onWheel={(e) => e.stopPropagation()}
-          >
-            <div className="h-1 w-full bg-purple-600" />
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="font-semibold text-gray-900">
-                  Allokera resurser
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowResourceModal(false);
-                    setSelectedPhaseForResources(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {!selectedPhaseForResources ? (
-                <>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Välj en fas för att tilldela resurser
-                  </p>
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                    {phases.length === 0 && (
-                      <p className="text-sm text-gray-400 py-4 text-center">
-                        Inga faser att allokera till
-                      </p>
-                    )}
-                    {phases.map((phase) => {
-                      const key = phaseKey(phase);
-                      const count = (phaseResourceMap[key] ?? []).length;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => setSelectedPhaseForResources(phase)}
-                          className="flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-purple-50 border border-gray-200 hover:border-purple-300 rounded-xl transition text-left"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                            <span className="text-sm font-medium text-gray-700">
-                              {phase.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {count > 0 && (
-                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                                {count} resurs{count > 1 ? "er" : ""}
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-400">
-                              Välj →
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setSelectedPhaseForResources(null)}
-                    className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 mb-3 transition"
-                  >
-                    ← Tillbaka
-                  </button>
-                  <p className="text-sm font-medium text-gray-700 mb-3">
-                    Resurser för{" "}
-                    <span className="text-purple-600">
-                      {selectedPhaseForResources.name}
-                    </span>
-                  </p>
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                    {allResources.length === 0 && (
-                      <p className="text-sm text-gray-400 py-4 text-center">
-                        Inga resurser hittades
-                      </p>
-                    )}
-                    {allResources.map((r) => {
-                      const key = phaseKey(selectedPhaseForResources);
-                      const selected = (phaseResourceMap[key] ?? []).includes(
-                        r.id,
-                      );
-                      return (
-                        <button
-                          key={r.id}
-                          onClick={() => toggleResourceForPhase(key, r.id)}
-                          className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition ${
-                            selected
-                              ? "bg-purple-50 border-purple-300"
-                              : "bg-gray-50 border-gray-200 hover:border-purple-200"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">
-                              {r.name[0].toUpperCase()}
-                            </div>
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-gray-700">
-                                {r.name}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {r.clLevel} · {r.location}
-                              </div>
-                            </div>
-                          </div>
-                          {selected && (
-                            <Check className="w-4 h-4 text-purple-600" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-end mt-4">
-                    <button
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm transition"
-                      onClick={() => setSelectedPhaseForResources(null)}
-                    >
-                      Klar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Floating bottom save bar */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-4 px-6 py-4 bg-white border-t border-gray-200 shadow-lg transition-transform duration-300 ease-in-out ${
+          hasPending || yearClampError ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        {yearClampError && (
+          <span className="text-amber-600 font-medium text-xs">
+            ⚠ {yearClampError}
+          </span>
+        )}
+        {hasPending && (
+          <>
+            <span className="text-gray-400 text-xs">
+              {Object.keys(pendingChanges).length}{" "}
+              {Object.keys(pendingChanges).length === 1
+                ? "osparad ändring"
+                : "osparade ändringar"}
+            </span>
+            <button
+              onClick={discardAll}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              <X className="w-3.5 h-3.5" />
+              Ångra
+            </button>
+            <button
+              onClick={saveAll}
+              disabled={savingPending}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition disabled:opacity-50"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {savingPending ? "Sparar..." : "Spara ändringar"}
+            </button>
+          </>
+        )}
+      </div>
+    </>
   );
 };
 

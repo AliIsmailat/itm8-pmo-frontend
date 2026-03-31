@@ -15,6 +15,7 @@ export type Phase = {
 interface PhaseBlockProps extends Phase {
   top?: number;
   weekWidth?: number;
+  isPending?: boolean;
   onEdit?: (phase: Phase) => void;
   onDragStart?: (
     type: "move" | "resize-left" | "resize-right",
@@ -50,6 +51,7 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
   owner,
   resources = [],
   status = "onTime",
+  isPending = false,
   onEdit,
   onDragStart,
   isDragging = false,
@@ -62,6 +64,8 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
   const leftPosition = (startWeek - 1) * weekWidth;
   const actualWidth = usedWeeks ? usedWeeks * weekWidth : 0;
   const totalWidth = duration * weekWidth;
+
+  const barColor = isPending ? "#a78bfa" : color;
 
   const statusColor =
     status === "onTime" ? "#16a34a" : status === "risk" ? "#f59e0b" : "#dc2626";
@@ -103,7 +107,7 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
         >
           <div
             className="px-3 py-2 flex items-center justify-between"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: barColor }}
           >
             <span className="font-semibold text-white text-[13px] truncate">
               {name}
@@ -195,17 +199,27 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
         onMouseLeave={() => setHover(false)}
         onMouseMove={handleMouseMove}
       >
-        {/* Left resize handle */}
+        {/* Left resize handle — visible on hover */}
         <div
-          className="absolute top-0 bottom-0 z-10"
-          style={{ left: 0, width: `${HANDLE_WIDTH}px`, cursor: "ew-resize" }}
+          className="absolute top-0 bottom-0 z-10 rounded-l transition-colors"
+          style={{
+            left: 0,
+            width: `${HANDLE_WIDTH}px`,
+            cursor: "col-resize",
+            backgroundColor: hover ? "rgba(255,255,255,0.35)" : "transparent",
+          }}
           onMouseDown={(e) => handleMouseDown(e, "resize-left")}
         />
 
-        {/* Right resize handle */}
+        {/* Right resize handle — visible on hover */}
         <div
-          className="absolute top-0 bottom-0 z-10"
-          style={{ right: 0, width: `${HANDLE_WIDTH}px`, cursor: "ew-resize" }}
+          className="absolute top-0 bottom-0 z-10 rounded-r transition-colors"
+          style={{
+            right: 0,
+            width: `${HANDLE_WIDTH}px`,
+            cursor: "col-resize",
+            backgroundColor: hover ? "rgba(255,255,255,0.35)" : "transparent",
+          }}
           onMouseDown={(e) => handleMouseDown(e, "resize-right")}
         />
 
@@ -237,8 +251,8 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({
         {/* Visual bar */}
         <div className="relative h-full w-full pointer-events-none">
           <div
-            className="absolute h-full rounded left-0 top-0"
-            style={{ width: `${totalWidth}px`, backgroundColor: color }}
+            className="absolute h-full rounded left-0 top-0 transition-colors"
+            style={{ width: `${totalWidth}px`, backgroundColor: barColor }}
           />
           {usedWeeks != null && (
             <div

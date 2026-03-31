@@ -199,10 +199,7 @@ const ProjectEditModal: React.FC<Props> = ({
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4 max-h-[75vh] overflow-y-auto px-1 pb-2"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-1 pb-2">
         <div className="relative">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
             <User className="w-4 h-4 text-gray-400" />

@@ -389,10 +389,10 @@ const GridView: React.FC<Props> = ({ projects, onSaved }) => {
         {hasPending && (
           <>
             <span className="text-gray-800 text-xs">
-              {Object.keys(pendingChanges).length} osparade{" "}
+              {Object.keys(pendingChanges).length}{" "}
               {Object.keys(pendingChanges).length === 1
-                ? "ändring"
-                : "ändringar"}
+                ? "Osparad ändring"
+                : "Osparade ändringar"}
             </span>
             <button
               onClick={discardAll}

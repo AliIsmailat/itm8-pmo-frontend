@@ -37,6 +37,7 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const lastScrollY = useRef(0);
 
   useEffect(() => {
@@ -56,13 +57,13 @@ const Navbar: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Lock body scroll when drawer is open
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    document.body.style.overflow =
+      drawerOpen || logoutModalOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [drawerOpen]);
+  }, [drawerOpen, logoutModalOpen]);
 
   const navLinks = [
     { to: "/", label: "Start", icon: Home },
@@ -188,7 +189,7 @@ const Navbar: React.FC = () => {
               {initial}
             </div>
             <button
-              onClick={handleLogout}
+              onClick={() => setLogoutModalOpen(true)}
               className="ml-1 p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition"
               title="Logga ut"
             >
@@ -279,7 +280,10 @@ const Navbar: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setDrawerOpen(false);
+              setLogoutModalOpen(true);
+            }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition text-sm"
           >
             <LogOut className="w-4 h-4" />
@@ -287,6 +291,48 @@ const Navbar: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ── Logout confirmation modal ── */}
+      {logoutModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.4)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
+          onClick={() => setLogoutModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-1 w-full bg-purple-600" />
+            <div className="p-6">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                Logga ut
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Är du säker på att du vill logga ut?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setLogoutModalOpen(false)}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-xl transition"
+                >
+                  Logga ut
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
