@@ -115,13 +115,10 @@ interface DragState {
   originalEndDate: string;
 }
 
-// Per-activity visual state during drag
 interface ActivityVisual {
   startWeek: number;
   duration: number;
 }
-
-// ── ActivityBar ────────────────────────────────────────────────────────────
 
 interface ActivityBarProps {
   activity: Activity;
@@ -252,7 +249,6 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
         onMouseLeave={() => setHover(false)}
         onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
       >
-        {/* Left resize handle */}
         <div
           className="absolute top-0 bottom-0 z-10 rounded-l transition-colors"
           style={{
@@ -267,8 +263,6 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
             onDragStart("resize-left", e.clientX);
           }}
         />
-
-        {/* Right resize handle */}
         <div
           className="absolute top-0 bottom-0 z-10 rounded-r transition-colors"
           style={{
@@ -283,8 +277,6 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
             onDragStart("resize-right", e.clientX);
           }}
         />
-
-        {/* Move area */}
         <div
           className="absolute top-0 bottom-0"
           style={{
@@ -301,8 +293,6 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
             if (!hasDragged.current) onEdit(activity);
           }}
         />
-
-        {/* Visual bar */}
         <div className="relative h-full w-full pointer-events-none">
           <div
             className="absolute h-full rounded left-0 top-0 transition-colors"
@@ -310,16 +300,14 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
           />
         </div>
       </div>
-
       {typeof document !== "undefined" && createPortal(tooltip, document.body)}
     </>
   );
 };
 
-// ── ActivityTimeline ───────────────────────────────────────────────────────
-
 interface Props {
   activities: Activity[];
+  projectEndDate: string;
   onEdit: (activity: Activity) => void;
   onDelete: (id: number) => void;
   onRefresh: () => void;
@@ -327,6 +315,7 @@ interface Props {
 
 const ActivityTimeline: React.FC<Props> = ({
   activities: initialActivities,
+  projectEndDate,
   onEdit,
   onDelete,
   onRefresh,
@@ -341,14 +330,16 @@ const ActivityTimeline: React.FC<Props> = ({
   >({});
   const [savingPending, setSavingPending] = useState(false);
   const [yearClampWarning, setYearClampWarning] = useState(false);
-
-  // Per-activity visual overrides during drag
+  const [projectEndWarning, setProjectEndWarning] = useState(false);
   const [visualOverrides, setVisualOverrides] = useState<
     Record<number, ActivityVisual>
   >({});
+  const visualOverridesRef = useRef<Record<number, ActivityVisual>>({});
   const dragRef = useRef<DragState | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const hasDraggedRef = useRef(false);
+
+  const projectEndWeek = getISOWeek(new Date(projectEndDate));
 
   useEffect(() => {
     setActivities(initialActivities);
@@ -376,7 +367,6 @@ const ActivityTimeline: React.FC<Props> = ({
         ? pending.startWeek + pending.duration
         : getISOWeek(new Date(activity.endDate));
       const duration = Math.max(1, endWeek - startWeek);
-      // const year = new Date(activity.startDate).getFullYear();
 
       dragRef.current = {
         activityId: activity.id,
@@ -386,73 +376,84 @@ const ActivityTimeline: React.FC<Props> = ({
         originalDuration: duration,
         originalStartDate: pending?.startDate ?? activity.startDate,
         originalEndDate: pending?.endDate ?? activity.endDate,
-        // originalYear: year,
       };
       hasDraggedRef.current = false;
       setDraggingId(activity.id);
       setYearClampWarning(false);
+      setProjectEndWarning(false);
     },
     [pendingChanges],
   );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current) return;
-    const { mode, startX, originalStartWeek, originalDuration } =
-      dragRef.current;
-    const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
-    if (deltaWeeks === 0) return;
-    hasDraggedRef.current = true;
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const { activityId, mode, startX, originalStartWeek, originalDuration } =
+        drag;
+      const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
+      if (deltaWeeks === 0) return;
+      hasDraggedRef.current = true;
 
-    const minWeek = 1;
-    const maxWeek = 52;
-    let newStart = originalStartWeek;
-    let newDuration = originalDuration;
-    let clamped = false;
+      const minWeek = 1;
+      const maxWeek = 52;
+      let newStart = originalStartWeek;
+      let newDuration = originalDuration;
+      let clamped = false;
 
-    if (mode === "move") {
-      newStart = originalStartWeek + deltaWeeks;
-      if (newStart < minWeek) {
-        newStart = minWeek;
-        clamped = true;
+      if (mode === "move") {
+        newStart = originalStartWeek + deltaWeeks;
+        if (newStart < minWeek) {
+          newStart = minWeek;
+          clamped = true;
+        }
+        if (newStart + newDuration - 1 > maxWeek) {
+          newStart = maxWeek - newDuration + 1;
+          clamped = true;
+        }
+      } else if (mode === "resize-right") {
+        newDuration = Math.max(
+          1,
+          Math.min(
+            originalDuration + deltaWeeks,
+            maxWeek - originalStartWeek + 1,
+          ),
+        );
+        if (newDuration !== originalDuration + deltaWeeks) clamped = true;
+      } else if (mode === "resize-left") {
+        const rawStart = originalStartWeek + deltaWeeks;
+        newStart = Math.max(
+          minWeek,
+          Math.min(rawStart, originalStartWeek + originalDuration - 1),
+        );
+        newDuration = Math.max(
+          1,
+          originalDuration - (newStart - originalStartWeek),
+        );
+        if (newStart !== rawStart) clamped = true;
       }
-      if (newStart + newDuration - 1 > maxWeek) {
-        newStart = maxWeek - newDuration + 1;
-        clamped = true;
-      }
-    } else if (mode === "resize-right") {
-      newDuration = Math.max(
-        1,
-        Math.min(
-          originalDuration + deltaWeeks,
-          maxWeek - originalStartWeek + 1,
-        ),
-      );
-      if (newDuration !== originalDuration + deltaWeeks) clamped = true;
-    } else if (mode === "resize-left") {
-      const rawStart = originalStartWeek + deltaWeeks;
-      newStart = Math.max(
-        minWeek,
-        Math.min(rawStart, originalStartWeek + originalDuration - 1),
-      );
-      newDuration = Math.max(
-        1,
-        originalDuration - (newStart - originalStartWeek),
-      );
-      if (newStart !== rawStart) clamped = true;
-    }
 
-    setYearClampWarning(clamped);
-    setVisualOverrides((prev) => ({
-      ...prev,
-      [dragRef.current!.activityId]: {
-        startWeek: newStart,
-        duration: newDuration,
-      },
-    }));
-  }, []);
+      setYearClampWarning(clamped);
+
+      // Warn if activity end week exceeds project end week
+      const newEndWeek = newStart + newDuration - 1;
+      setProjectEndWarning(newEndWeek > projectEndWeek);
+
+      const next = {
+        ...visualOverridesRef.current,
+        [activityId]: { startWeek: newStart, duration: newDuration },
+      };
+      visualOverridesRef.current = next;
+      setVisualOverrides(next);
+    },
+    [projectEndWeek],
+  );
 
   const handleMouseUp = useCallback(() => {
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
+    dragRef.current = null;
+
     const {
       activityId,
       mode,
@@ -460,24 +461,21 @@ const ActivityTimeline: React.FC<Props> = ({
       originalDuration,
       originalStartDate,
       originalEndDate,
-    } = dragRef.current;
-    dragRef.current = null;
+    } = drag;
     setDraggingId(null);
 
-    const visual = visualOverrides[activityId];
+    const visual = visualOverridesRef.current[activityId];
+    const next = { ...visualOverridesRef.current };
+    delete next[activityId];
+    visualOverridesRef.current = next;
+    setVisualOverrides(next);
+
     if (!visual) return;
 
     const didMove =
       visual.startWeek !== originalStartWeek ||
       visual.duration !== originalDuration;
-    if (!didMove) {
-      setVisualOverrides((prev) => {
-        const n = { ...prev };
-        delete n[activityId];
-        return n;
-      });
-      return;
-    }
+    if (!didMove) return;
 
     const startDelta = (visual.startWeek - originalStartWeek) * 7;
     const durationDelta = (visual.duration - originalDuration) * 7;
@@ -504,12 +502,7 @@ const ActivityTimeline: React.FC<Props> = ({
         duration: visual.duration,
       },
     }));
-    setVisualOverrides((prev) => {
-      const n = { ...prev };
-      delete n[activityId];
-      return n;
-    });
-  }, [visualOverrides]);
+  }, []);
 
   const saveAll = async () => {
     setSavingPending(true);
@@ -522,7 +515,6 @@ const ActivityTimeline: React.FC<Props> = ({
           }),
         ),
       );
-      // Update stored dates so future drags use correct originals
       setActivities((prev) =>
         prev.map((a) => {
           const change = pendingChanges[a.id];
@@ -532,6 +524,7 @@ const ActivityTimeline: React.FC<Props> = ({
       );
       setPendingChanges({});
       setYearClampWarning(false);
+      setProjectEndWarning(false);
     } catch (err) {
       console.error("Failed to save activity changes:", err);
     } finally {
@@ -541,8 +534,10 @@ const ActivityTimeline: React.FC<Props> = ({
 
   const discardAll = () => {
     setPendingChanges({});
+    visualOverridesRef.current = {};
     setVisualOverrides({});
     setYearClampWarning(false);
+    setProjectEndWarning(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -590,6 +585,7 @@ const ActivityTimeline: React.FC<Props> = ({
   const allActive = activeFilters.size === ALL_STATUSES.length;
   const visibleStatuses = ALL_STATUSES.filter((s) => activeFilters.has(s));
   const hasPending = Object.keys(pendingChanges).length > 0;
+  const showBar = hasPending || yearClampWarning || projectEndWarning;
 
   return (
     <>
@@ -599,10 +595,23 @@ const ActivityTimeline: React.FC<Props> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* Toolbar */}
         <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b gap-4">
           <h2 className="font-semibold text-base flex-shrink-0">Aktiviteter</h2>
           <div className="flex items-center gap-1.5 flex-wrap">
+            {(yearClampWarning || projectEndWarning) && (
+              <div className="flex flex-col gap-1">
+                {yearClampWarning && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                    ⚠ Aktiviteten kan inte dras utanför vecka 1–52
+                  </span>
+                )}
+                {projectEndWarning && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                    ⚠ Aktiviteten sträcker sig bortom projektets slutdatum
+                  </span>
+                )}
+              </div>
+            )}
             <button
               onClick={toggleAll}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition border ${
@@ -640,7 +649,6 @@ const ActivityTimeline: React.FC<Props> = ({
         </div>
 
         <div className="overflow-x-auto">
-          {/* Month header */}
           <div
             className="grid bg-gray-50 border-b"
             style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
@@ -657,7 +665,6 @@ const ActivityTimeline: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Week header */}
           <div
             className="grid bg-gray-50 border-b"
             style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
@@ -673,7 +680,6 @@ const ActivityTimeline: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Grouped activity rows */}
           {visibleStatuses.map((status) => {
             const cfg = STATUS_CONFIG[status];
             const group = activities.filter((a) => a.status === status);
@@ -795,17 +801,23 @@ const ActivityTimeline: React.FC<Props> = ({
         onCancel={() => setConfirmId(null)}
       />
 
-      {/* Floating bottom save bar */}
       <div
         className={`fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-4 px-6 py-4 bg-white border-t border-gray-200 shadow-lg transition-transform duration-300 ease-in-out ${
-          hasPending || yearClampWarning ? "translate-y-0" : "translate-y-full"
+          showBar ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        {yearClampWarning && (
-          <span className="text-amber-600 font-medium text-xs">
-            ⚠ Aktiviteten kan inte dras utanför vecka 1–52
-          </span>
-        )}
+        <div className="flex flex-col items-center gap-1">
+          {yearClampWarning && (
+            <span className="text-amber-600 font-medium text-xs">
+              ⚠ Aktiviteten kan inte dras utanför vecka 1–52
+            </span>
+          )}
+          {projectEndWarning && (
+            <span className="text-amber-600 font-medium text-xs">
+              ⚠ Aktiviteten sträcker sig bortom projektets slutdatum
+            </span>
+          )}
+        </div>
         {hasPending && (
           <>
             <span className="text-gray-400 text-xs">

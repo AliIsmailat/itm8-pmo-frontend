@@ -21,6 +21,7 @@ interface GanttPhase extends Phase {
 interface GanttChartProps {
   phases: GanttPhase[];
   projectId: number;
+  projectEndDate: string;
   onPhasesChanged?: () => void;
 }
 
@@ -111,6 +112,7 @@ const inputClass =
 const GanttChart: React.FC<GanttChartProps> = ({
   phases: initialPhases,
   projectId,
+  projectEndDate,
   onPhasesChanged,
 }) => {
   const [phases, setPhases] = useState<GanttPhase[]>(initialPhases);
@@ -126,17 +128,16 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [yearClampError, setYearClampError] = useState<string | null>(null);
+  const [projectEndWarning, setProjectEndWarning] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<
     Record<number, PendingChange>
   >({});
   const [savingPending, setSavingPending] = useState(false);
 
-  // Drag state
   const dragRef = useRef<DragState | null>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const hasDraggedRef = useRef(false);
 
-  // Resource allocation state
   const [allResources, setAllResources] = useState<Resource[]>([]);
   const [selectedPhaseForResources, setSelectedPhaseForResources] =
     useState<GanttPhase | null>(null);
@@ -144,10 +145,12 @@ const GanttChart: React.FC<GanttChartProps> = ({
     Record<string, number[]>
   >({});
 
+  const projectEndWeek = getISOWeek(new Date(projectEndDate));
   const currentWeek = getISOWeek();
   const months = getMonthSpans();
   const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
   const hasPending = Object.keys(pendingChanges).length > 0;
+  const showBar = hasPending || !!yearClampError || projectEndWarning;
 
   useEffect(() => {
     getResources().then(setAllResources).catch(console.error);
@@ -157,8 +160,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
     setPhases(initialPhases);
   }, [initialPhases]);
 
-  // ── Drag handlers ──────────────────────────────────────────────────────────
-
   const handleDragStart = useCallback(
     (
       phaseIdx: number,
@@ -166,7 +167,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
       clientX: number,
     ) => {
       const phase = phases[phaseIdx];
-      // Use pending state as base if it exists
       const pending = pendingChanges[phase.id];
       dragRef.current = {
         phaseIdx,
@@ -191,61 +191,68 @@ const GanttChart: React.FC<GanttChartProps> = ({
     [phases, pendingChanges],
   );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current) return;
-    const {
-      phaseIdx,
-      type,
-      startX,
-      originalStartWeek,
-      originalDuration,
-      phaseYear,
-    } = dragRef.current;
-    const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
-    if (deltaWeeks === 0) return;
-    hasDraggedRef.current = true;
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!dragRef.current) return;
+      const {
+        phaseIdx,
+        type,
+        startX,
+        originalStartWeek,
+        originalDuration,
+        phaseYear,
+      } = dragRef.current;
+      const deltaWeeks = Math.trunc((e.clientX - startX) / WEEK_WIDTH);
+      if (deltaWeeks === 0) return;
+      hasDraggedRef.current = true;
 
-    const yearStart = getISOWeek(new Date(Date.UTC(phaseYear, 0, 4)));
-    const minWeek = yearStart;
-    const maxWeek = 52;
+      const yearStart = getISOWeek(new Date(Date.UTC(phaseYear, 0, 4)));
+      const minWeek = yearStart;
+      const maxWeek = 52;
 
-    setPhases((prev) => {
-      const updated = [...prev];
-      const phase = { ...updated[phaseIdx] };
+      setPhases((prev) => {
+        const updated = [...prev];
+        const phase = { ...updated[phaseIdx] };
 
-      if (type === "move") {
-        const rawStart = originalStartWeek + deltaWeeks;
-        const clampedStart = Math.min(
-          Math.max(minWeek, rawStart),
-          maxWeek - originalDuration + 1,
-        );
-        phase.startWeek = clampedStart;
-        if (clampedStart !== rawStart) {
-          setYearClampError(
-            `Faser kan inte flyttas utanför sitt år (${phaseYear})`,
+        if (type === "move") {
+          const rawStart = originalStartWeek + deltaWeeks;
+          const clampedStart = Math.min(
+            Math.max(minWeek, rawStart),
+            maxWeek - originalDuration + 1,
           );
-        } else {
-          setYearClampError(null);
+          phase.startWeek = clampedStart;
+          if (clampedStart !== rawStart) {
+            setYearClampError(
+              `Faser kan inte flyttas utanför sitt år (${phaseYear})`,
+            );
+          } else {
+            setYearClampError(null);
+          }
+        } else if (type === "resize-right") {
+          phase.duration = Math.min(
+            Math.max(1, originalDuration + deltaWeeks),
+            maxWeek - phase.startWeek + 1,
+          );
+        } else if (type === "resize-left") {
+          const newStart = Math.max(minWeek, originalStartWeek + deltaWeeks);
+          const newDuration = Math.max(
+            1,
+            originalDuration - (newStart - originalStartWeek),
+          );
+          phase.startWeek = newStart;
+          phase.duration = newDuration;
         }
-      } else if (type === "resize-right") {
-        phase.duration = Math.min(
-          Math.max(1, originalDuration + deltaWeeks),
-          maxWeek - phase.startWeek + 1,
-        );
-      } else if (type === "resize-left") {
-        const newStart = Math.max(minWeek, originalStartWeek + deltaWeeks);
-        const newDuration = Math.max(
-          1,
-          originalDuration - (newStart - originalStartWeek),
-        );
-        phase.startWeek = newStart;
-        phase.duration = newDuration;
-      }
 
-      updated[phaseIdx] = phase;
-      return updated;
-    });
-  }, []);
+        // Warn if phase end week exceeds project end week
+        const phaseEndWeek = phase.startWeek + phase.duration - 1;
+        setProjectEndWarning(phaseEndWeek > projectEndWeek);
+
+        updated[phaseIdx] = phase;
+        return updated;
+      });
+    },
+    [projectEndWeek],
+  );
 
   const handleMouseUp = useCallback(async () => {
     if (!dragRef.current) return;
@@ -264,7 +271,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
     const didMove =
       phase.startWeek !== originalStartWeek ||
       phase.duration !== originalDuration;
-
     if (!didMove) return;
 
     const startWeekDelta = phase.startWeek - originalStartWeek;
@@ -284,7 +290,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
       newStart.setUTCDate(newStart.getUTCDate() + startDayDelta);
     }
 
-    // Store as pending instead of saving immediately
     setPendingChanges((prev) => ({
       ...prev,
       [phase.id]: {
@@ -309,7 +314,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
           }),
         ),
       );
-      // Update stored dates on phases so future drags use correct originals
       setPhases((prev) =>
         prev.map((p) => {
           const change = pendingChanges[p.id];
@@ -319,6 +323,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
       );
       setPendingChanges({});
       setYearClampError(null);
+      setProjectEndWarning(false);
     } catch (err) {
       console.error("Failed to save phase changes:", err);
       if (axios.isAxiosError(err))
@@ -329,7 +334,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
   };
 
   const discardAll = () => {
-    // Revert visual positions
     setPhases((prev) =>
       prev.map((p) => {
         const change = pendingChanges[p.id];
@@ -346,9 +350,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
     );
     setPendingChanges({});
     setYearClampError(null);
+    setProjectEndWarning(false);
   };
-
-  // ── Edit / save ────────────────────────────────────────────────────────────
 
   const anyModalOpen =
     !!selectedPhase ||
@@ -378,7 +381,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
         !original ||
         original.startWeek !== selectedPhase.startWeek ||
         original.duration !== selectedPhase.duration;
-
       await updatePhase(selectedPhase.id, {
         name: selectedPhase.name,
         startDate: weeksChanged
@@ -483,7 +485,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* Toolbar */}
         <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b flex-wrap gap-2">
           <h2 className="font-semibold text-base">Tidsplan</h2>
           <div className="flex items-center gap-2 flex-wrap">
@@ -510,7 +511,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
         </div>
 
         <div className="overflow-x-auto">
-          {/* Month header */}
           <div
             className="grid bg-gray-50 border-b"
             style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
@@ -527,7 +527,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
             ))}
           </div>
 
-          {/* Week header */}
           <div
             className="grid bg-gray-50 border-b"
             style={{ gridTemplateColumns: `160px repeat(52, ${WEEK_WIDTH}px)` }}
@@ -543,7 +542,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
             ))}
           </div>
 
-          {/* Phase rows */}
           {phases.map((phase, idx) => {
             const key = phaseKey(phase);
             const allocatedCount = (phaseResourceMap[key] ?? []).length;
@@ -625,7 +623,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           )}
         </div>
 
-        {/* ── Edit modal ── */}
+        {/* Edit modal */}
         {selectedPhase && (
           <div
             className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -718,7 +716,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           </div>
         )}
 
-        {/* ── Add modal ── */}
+        {/* Add modal */}
         {showAddModal && (
           <div
             className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -814,7 +812,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
           </div>
         )}
 
-        {/* ── Delete confirm ── */}
         <DeleteConfirmModal
           isOpen={deleteConfirmId !== null}
           entityName={phases.find((p) => p.id === deleteConfirmId)?.name}
@@ -824,7 +821,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           onCancel={() => setDeleteConfirmId(null)}
         />
 
-        {/* ── Resource allocation modal ── */}
+        {/* Resource modal */}
         {showResourceModal && (
           <div
             className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -854,7 +851,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-
                 {!selectedPhaseForResources ? (
                   <>
                     <p className="text-xs text-gray-500 mb-3">
@@ -925,11 +921,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                           <button
                             key={r.id}
                             onClick={() => toggleResourceForPhase(key, r.id)}
-                            className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition ${
-                              selected
-                                ? "bg-purple-50 border-purple-300"
-                                : "bg-gray-50 border-gray-200 hover:border-purple-200"
-                            }`}
+                            className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition ${selected ? "bg-purple-50 border-purple-300" : "bg-gray-50 border-gray-200 hover:border-purple-200"}`}
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">
@@ -970,14 +962,21 @@ const GanttChart: React.FC<GanttChartProps> = ({
       {/* Floating bottom save bar */}
       <div
         className={`fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-4 px-6 py-4 bg-white border-t border-gray-200 shadow-lg transition-transform duration-300 ease-in-out ${
-          hasPending || yearClampError ? "translate-y-0" : "translate-y-full"
+          showBar ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        {yearClampError && (
-          <span className="text-amber-600 font-medium text-xs">
-            ⚠ {yearClampError}
-          </span>
-        )}
+        <div className="flex flex-col items-center gap-1">
+          {yearClampError && (
+            <span className="text-amber-600 font-medium text-xs">
+              ⚠ {yearClampError}
+            </span>
+          )}
+          {projectEndWarning && (
+            <span className="text-amber-600 font-medium text-xs">
+              ⚠ Fasen sträcker sig bortom projektets slutdatum
+            </span>
+          )}
+        </div>
         {hasPending && (
           <>
             <span className="text-gray-400 text-xs">

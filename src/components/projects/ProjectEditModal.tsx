@@ -17,17 +17,16 @@ import type { Project } from "../../utils/projects";
 import type { ContactPerson } from "../../utils/clients";
 import { getResources } from "../../utils/resources";
 import type { Resource } from "../../utils/resources";
-import axios from "axios";
+import api from "../../utils/axiosInstance";
 
-const CONTACT_URL = "http://localhost:5000/api/contactPersons";
 const RESOURCE_PAGE_SIZE = 8;
 
 async function getContactPersonsByClientId(
   clientId: number,
 ): Promise<ContactPerson[]> {
   try {
-    const res = await axios.get<ContactPerson[]>(
-      `${CONTACT_URL}/by-client/${clientId}`,
+    const res = await api.get<ContactPerson[]>(
+      `/ContactPersons/by-client/${clientId}`,
     );
     return res.data;
   } catch {
