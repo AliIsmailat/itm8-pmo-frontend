@@ -77,6 +77,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
   const [activityView, setActivityView] = useState<"timeline" | "board">(
     "timeline",
   );
+  const resourceModalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -102,19 +103,10 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
   const anyModalOpen = activityModalOpen || editModalOpen || !!selectedResource;
 
   useEffect(() => {
-    if (anyModalOpen) {
-      document.body.style.overflow = "hidden";
-      const prevent = (e: Event) => e.preventDefault();
-      document.addEventListener("wheel", prevent, { passive: false });
-      document.addEventListener("touchmove", prevent, { passive: false });
-      return () => {
-        document.body.style.overflow = "";
-        document.removeEventListener("wheel", prevent);
-        document.removeEventListener("touchmove", prevent);
-      };
-    } else {
+    document.body.style.overflow = anyModalOpen ? "hidden" : "";
+    return () => {
       document.body.style.overflow = "";
-    }
+    };
   }, [anyModalOpen]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,6 +291,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
         {activityView === "timeline" ? (
           <ActivityTimeline
             activities={activities}
+            projectEndDate={project.endDate}
             onEdit={(a) => {
               setEditingActivity(a);
               setActivityModalOpen(true);
@@ -336,6 +329,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
         <GanttChart
           phases={ganttPhases}
           projectId={projectId}
+          projectEndDate={project.endDate}
           onPhasesChanged={reloadProject}
         />
       </section>
@@ -365,7 +359,6 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
         }}
       />
 
-      {/* Resource detail modal */}
       {selectedResource && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -373,6 +366,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
+            ref={resourceModalRef}
             className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -387,7 +381,6 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
             >
               <X className="w-5 h-5" />
             </button>
-
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-full bg-purple-600 text-white text-xl font-bold flex items-center justify-center shrink-0">
                 {selectedResource.name[0].toUpperCase()}
@@ -399,9 +392,7 @@ const ProjectDetailsContainer: React.FC<Props> = ({ projectId }) => {
                 <span className="text-xs text-gray-400">Resurs</span>
               </div>
             </div>
-
             <div className="h-px bg-gray-100" />
-
             <div className="flex flex-col gap-3">
               {selectedResource.email && (
                 <div className="flex items-center gap-3 text-sm text-gray-600">
