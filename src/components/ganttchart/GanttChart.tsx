@@ -8,6 +8,9 @@ import { getResources } from "../../utils/resources";
 import type { Resource } from "../../utils/resources";
 import DeleteConfirmModal from "../ui/DeleteConfirmModal";
 
+// CODE REVIEW: Denna komponent har vuxit sig ganska stor och komplex. Det finns flera mindre delar som skulle kunna brytas ut i egna komponenter för att göra koden mer hanterbar och lättare att förstå. 
+// Funktionerna med datum bör flyttas till util och återanvändas där de behövs
+
 const WEEK_WIDTH = 24;
 const ROW_HEIGHT = 40;
 

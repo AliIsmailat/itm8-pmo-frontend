@@ -102,7 +102,7 @@ const CustomerActionsContainer: React.FC<Props> = ({
         onClientUpdated?.();
       } else {
         const res = await axios.post<{ id: number }>(
-          "http://localhost:5000/api/clients",
+          "http://localhost:5000/api/clients",  // CODE REVIEW: Hårdkodad URL, använd environment variables eller liknande.
           formData,
         );
         const clientId = res.data.id;
@@ -111,7 +111,7 @@ const CustomerActionsContainer: React.FC<Props> = ({
           contactPersons
             .filter((cp) => cp.name.trim())
             .map((cp) =>
-              axios.post("http://localhost:5000/api/contactPersons", {
+              axios.post("http://localhost:5000/api/contactPersons", {  // CODE REVIEW: Hårdkodad URL, använd environment variables eller liknande.
                 name: cp.name,
                 email: cp.email,
                 phoneNumber: cp.phoneNumber,

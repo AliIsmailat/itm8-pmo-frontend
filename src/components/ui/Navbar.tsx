@@ -18,6 +18,7 @@ interface JwtPayload {
   role: string;
 }
 
+// CODE REVIEW: Denna funktion bör ligga i auth utils
 function getUserFromToken(): { username: string; role: string } {
   const token = getToken();
   if (!token) return { username: "User", role: "Admin" };
@@ -65,6 +66,7 @@ const Navbar: React.FC = () => {
     };
   }, [drawerOpen, logoutModalOpen]);
 
+  // CODE REVIEW: Denna const bör ligga utanför komponenten, den behöver inte skapas på nytt varje gång komponenten renderas
   const navLinks = [
     { to: "/", label: "Start", icon: Home },
     { to: "/projects", label: "Projekt", icon: Folder },

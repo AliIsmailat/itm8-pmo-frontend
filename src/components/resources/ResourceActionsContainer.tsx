@@ -115,7 +115,7 @@ const ResourceActionsContainer: React.FC<Props> = ({
         });
         onResourceUpdated?.();
       } else {
-        await axios.post("http://localhost:5000/api/Resources", {
+        await axios.post("http://localhost:5000/api/Resources", { // CODE REVIEW: Hårdkodad URL, använd environment variables eller liknande.
           ...formData,
           skills: skillPayload,
         });

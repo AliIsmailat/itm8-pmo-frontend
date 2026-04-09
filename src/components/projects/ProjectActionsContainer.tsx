@@ -20,7 +20,7 @@ import type { Resource } from "../../utils/resources";
 import { createProject } from "../../utils/projects";
 import axios from "axios";
 
-const CONTACT_URL = "http://localhost:5000/api/contactPersons";
+const CONTACT_URL = "http://localhost:5000/api/contactPersons"; // CODE REVIEW: Hårdkodad URL, använd environment variables eller liknande.
 
 async function getContactPersonsByClientId(
   clientId: number,

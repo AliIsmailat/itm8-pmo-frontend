@@ -9,7 +9,7 @@ import "./index.css";
 
 msalInstance.initialize().then(() => {
   msalInstance
-    .handleRedirectPromise()
+    .handleRedirectPromise()  // CODER REVIEW: Denna är inte nödvändig att anropa manuellt, den körs automatiskt av MSAL när appen startar. Se https://github.com/AzureAD/microsoft-authentication-library-for-js/blob/dev/lib/msal-react/FAQ.md#how-do-i-handle-the-redirect-flow-in-a-react-app
     .then(() => {
       ReactDOM.createRoot(document.getElementById("root")!).render(
         <React.StrictMode>

@@ -1,6 +1,8 @@
 import React from "react";
 import AuthBrandingPanel from "./AuthBrandingPanel";
 
+// CODE REVIEW: React har en typ som heter PropsWithChildren som kan användas (eller extendas) istället för att definiera en egen interface med children. 
+
 interface Props {
   children: React.ReactNode;
 }

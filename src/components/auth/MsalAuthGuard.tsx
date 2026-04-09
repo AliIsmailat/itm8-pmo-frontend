@@ -18,6 +18,8 @@ const MsalAuthGuard: React.FC<MsalAuthGuardProps> = ({ children }) => {
     }
   }, [isEntraAuthenticated, inProgress, instance]);
 
+  // CODE REVIEW: Nedan if-satser renderar i princip samma ui. Gör en liten komponent för det.
+
   if (inProgress !== InteractionStatus.None) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">

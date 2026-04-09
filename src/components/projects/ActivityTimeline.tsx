@@ -131,6 +131,8 @@ interface ActivityBarProps {
   hasDragged: React.MutableRefObject<boolean>;
 }
 
+// CODE REVIEW: ActivityBar bör flyttas till egen komponent
+
 const ActivityBar: React.FC<ActivityBarProps> = ({
   activity,
   weekWidth,

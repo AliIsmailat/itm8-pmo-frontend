@@ -130,6 +130,8 @@ const LoginForm: React.FC = () => {
 
 export default LoginForm;
 
+// CODE REVIEW: Städa nedan...
+
 // import React, { useState } from "react";
 // import { useNavigate } from "react-router-dom";
 // import { Eye, EyeOff, Mail, Lock } from "lucide-react";
