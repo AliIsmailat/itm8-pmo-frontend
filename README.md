@@ -4,9 +4,9 @@
 
 PMO Tool is a project management system developed for itm8. It provides an overview of projects, resources, clients and activities, with support for Gantt-based timelines and archiving.
 
-### Production Environment
+Some configuration and deployment files have been removed from this public version for security reasons (internal CI/CD pipeline, client branding assets).
 
-> _(link provided by the responsible associate)_
+### Production Environment
 
 Login is handled via **Microsoft account (SSO)** followed by application-level authentication.
 
@@ -16,12 +16,10 @@ Login is handled via **Microsoft account (SSO)** followed by application-level a
 
 The system is built around a hierarchy where each object depends on the one above it:
 
-```
 Client
 └── Project (requires a client)
-    ├── Activity (requires a project)
-    └── Phase (requires a project)
-```
+├── Activity (requires a project)
+└── Phase (requires a project)
 
 A **resource** is created independently but must be assigned to a project before it can be linked to activities.
 
@@ -71,17 +69,6 @@ Use the **feedback button** in the bottom right corner to report bugs or leave c
 - **Backend:** ASP.NET Core (C#)
 - **Database:** SQLite via Entity Framework Core
 - **Auth:** MSAL (Microsoft Entra ID) + JWT
-
-#### Repository
-
-`https://dev.azure.com/AddPro/itm8.LIA/_git/PMO.Tool`
-
-#### Branches
-
-| Branch                     | Description                                  |
-| -------------------------- | -------------------------------------------- |
-| `frontend-main`            | Production branch, pipeline triggers on push |
-| `frontend-activities-drag` | Latest feature branch                        |
 
 #### Local Development
 

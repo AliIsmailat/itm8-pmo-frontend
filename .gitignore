@@ -27,3 +27,5 @@ src/mockdata/
 *.njsproj
 *.sln
 *.sw?
+.env.*.local
+*.env.local

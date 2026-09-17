@@ -1,7 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import MainLayout from "./layout/MainLayout";
-import MsalAuthGuard from "./components/auth/MsalAuthGuard";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
@@ -10,8 +9,8 @@ import Customers from "./pages/Customers";
 import Archive from "./pages/Archive";
 import Login from "./pages/Login";
 import { isAuthenticated } from "./utils/auth";
+import MsalAuthGuard from "./components/auth/MsalAuthGuard";
 
-/** Guards routes that require app-level login (JWT from /api/Auth/login). */
 const AppProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -26,11 +25,7 @@ const App: React.FC = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === "/login";
 
-  // CODE REVIEW: Det känns lite överflödigt att ha både MsalAuthGuard och AppProtectedRoute per route. 
-  // MsalAuthGuard borde i princip kunna hantera både inloggning via MSAL och att visa login-sidan om användaren inte är inloggad, utan att vi behöver en separat AppProtectedRoute. 
-  // Det skulle förenkla både komponentstrukturen och routing-logiken. 
-
-    return (
+  return (
     <MsalAuthGuard>
       {isLoginPage ? (
         <Routes>

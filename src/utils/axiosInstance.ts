@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getToken } from "./auth";
+import { getToken, clearToken } from "./auth";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -7,7 +7,6 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    // App-level JWT for controller [Authorize] attributes
     const appToken = getToken();
     if (appToken) {
       config.headers.Authorization = `Bearer ${appToken}`;
@@ -21,7 +20,8 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn("401 Unauthorized — check app JWT.");
+      clearToken();
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   },
